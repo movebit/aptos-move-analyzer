@@ -198,7 +198,7 @@ impl Handler {
 
     /*
     fn get_global_env_all_ty_mapping(&mut self, env: &GlobalEnv) {
-        log::info!("lll >> <on_references>get_global_env_all_ty_mapping =======================================\n\n");
+        log::info!(">> <on_references>get_global_env_all_ty_mapping =======================================\n\n");
         for module_env in env.get_modules() {
             let module_id = module_env.get_id();
             for struct_env in module_env.get_structs() {
@@ -474,7 +474,7 @@ impl Handler {
         for field_env in target_struct.get_fields() {
             let field_name = field_env.get_name();
             let field_name_str = field_name.display(env.symbol_pool());
-            log::info!("lll >> field_name = {}", field_name_str);
+            log::info!(">> field_name = {}", field_name_str);
             let struct_source = env.get_source(&target_struct_loc);
             if let Ok(struct_str) = struct_source {
                 if let Some(index) = struct_str.find(field_name_str.to_string().as_str()) {
@@ -503,7 +503,7 @@ impl Handler {
                             {
                                 continue;
                             }
-                            log::info!("lll >> atomic_field_source = {:?}", atomic_field_source);
+                            log::info!(">> atomic_field_source = {:?}", atomic_field_source);
                             let field_type = field_env.get_type();
                             self.process_type(env, &atomic_field_loc, &field_type);
                         }

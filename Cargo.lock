@@ -593,7 +593,7 @@ dependencies = [
 [[package]]
 name = "commentfmt"
 version = "1.6.0"
-source = "git+https://github.com/movebit/movefmt.git?rev=4c69626cdc365b8ceb6813b7367bcbaef6548d41#4c69626cdc365b8ceb6813b7367bcbaef6548d41"
+source = "git+https://github.com/movebit/movefmt.git?branch=develop#dbe8d79d46a0469a4d450bb587f725cf3b59cd76"
 dependencies = [
  "annotate-snippets",
  "anyhow",
@@ -617,7 +617,7 @@ dependencies = [
 [[package]]
 name = "config_proc_macro"
 version = "0.3.0"
-source = "git+https://github.com/movebit/movefmt.git?rev=4c69626cdc365b8ceb6813b7367bcbaef6548d41#4c69626cdc365b8ceb6813b7367bcbaef6548d41"
+source = "git+https://github.com/movebit/movefmt.git?branch=develop#dbe8d79d46a0469a4d450bb587f725cf3b59cd76"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2927,8 +2927,8 @@ dependencies = [
 
 [[package]]
 name = "movefmt"
-version = "1.0.0"
-source = "git+https://github.com/movebit/movefmt.git?rev=4c69626cdc365b8ceb6813b7367bcbaef6548d41#4c69626cdc365b8ceb6813b7367bcbaef6548d41"
+version = "1.0.1"
+source = "git+https://github.com/movebit/movefmt.git?branch=develop#dbe8d79d46a0469a4d450bb587f725cf3b59cd76"
 dependencies = [
  "anyhow",
  "bisection",

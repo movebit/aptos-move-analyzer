@@ -1,14 +1,17 @@
 // Copyright (c) The BitsLab.MoveBit Contributors
 // SPDX-License-Identifier: Apache-2.0
-use crate::{context::*, utils::path_concat};
 use lsp_server::{Request, *};
-use lsp_types::{CompletionItem, CompletionItemKind, CompletionParams, Position};
+use crate::{
+    context::*,
+    utils::path_concat,
+};
+use lsp_types::*;
 use move_command_line_common::files::FileHash;
 use move_compiler::parser::{
     keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS, PRIMITIVE_TYPES},
     lexer::{Lexer, Tok},
 };
-use move_model::model::GlobalEnv;
+use move_model::model::{GlobalEnv, ModuleEnv};
 use std::vec;
 
 /// Constructs an `lsp_types::CompletionItem` with the given `label` and `kind`.
@@ -81,7 +84,7 @@ fn get_cursor_token(buffer: &str, position: &Position) -> Option<Tok> {
             } else {
                 Some(Tok::Colon)
             }
-        },
+        }
         _ => None,
     }
 }
@@ -141,6 +144,49 @@ fn lexer_for_buffer(buffer: &str, is_dedup: bool) -> Vec<&str> {
         }
     }
     ids
+}
+
+fn handle_identifiers_for_period(
+    target_module_env: &[ModuleEnv],
+    string_tokens: &Vec<&str>,
+    env: &GlobalEnv,
+) -> Vec<CompletionItem> {
+    let mut result = vec![];
+    log::info!("string_tokens = {:?}", string_tokens);
+    if string_tokens.len() <= 1 {
+        return result;
+    }
+    let mut add_item_fn = |module_env: &ModuleEnv| {
+        for func_env in module_env.get_functions() {
+            result.push(completion_item(
+                func_env.get_name_str().as_str(),
+                CompletionItemKind::FUNCTION,
+            ));
+        }
+        for struct_env in module_env.get_structs() {
+            for field_env in struct_env.get_fields() {
+                result.push(completion_item(
+                    &field_env.get_name().display(env.symbol_pool()).to_string(),
+                    CompletionItemKind::FIELD,
+                ));
+            }
+        }
+    };
+
+    for module_env in target_module_env {
+        add_item_fn(module_env);
+
+        for use_decl in module_env.get_use_decls() {
+            let used_module_name = use_decl.module_name.display_full(env).to_string();
+            log::info!("used_module_name = {:?}", used_module_name);
+            for module_env_i in env.get_modules() {
+                if used_module_name.ends_with(&module_env_i.get_name().display(&env).to_string()) {
+                    add_item_fn(&module_env_i);
+                }
+            }
+        }
+    }
+    result
 }
 
 fn handle_identifiers_for_coloncolon(
@@ -253,8 +299,17 @@ pub fn on_completion_request(context: &Context, request: &Request) -> lsp_server
                 result: Some(serde_json::json!({"msg": "No available project"})),
                 error: None,
             };
-        },
+        }
     };
+
+    let candidate_modules = crate::utils::get_modules_by_fpath_in_all_modules(
+        &current_project.global_env,
+        &std::path::PathBuf::from(fpath),
+    );
+    if candidate_modules.is_empty() {
+        log::error!("<completion>cannot get target module\n");
+    }
+    log::info!("-------------------- 0624 --------------------");
 
     let file_buffer_str = current_project.current_modifing_file_content.as_str();
     let buffer = Some(file_buffer_str);
@@ -294,16 +349,22 @@ pub fn on_completion_request(context: &Context, request: &Request) -> lsp_server
     match cursor {
         Some(Tok::Colon) => {
             items.extend_from_slice(&primitive_types());
-        },
+        }
         Some(Tok::ColonColon) => {
             // `.` or `::` must be followed by identifiers, which are added to the completion items.
             let module_items =
                 handle_identifiers_for_coloncolon(&cursor_line_tokens, &current_project.global_env);
             items.extend_from_slice(&module_items);
-        },
+        }
         Some(Tok::Period) => {
+            let module_items = handle_identifiers_for_period(
+                &candidate_modules,
+                &cursor_line_tokens,
+                &current_project.global_env,
+            );
+            items.extend_from_slice(&module_items);
             log::info!("Tok::Period");
-        },
+        }
         _ => {
             // If the user's cursor is positioned anywhere other than following a `.`, `:`, or `::`,
             // offer them Move's keywords, operators, and builtins as completion items.
@@ -329,7 +390,7 @@ pub fn on_completion_request(context: &Context, request: &Request) -> lsp_server
                 let file_items = handle_file_identifiers(cursor_token_str, &mut token_str_in_file);
                 items.extend_from_slice(&file_items);
             }
-        },
+        }
     }
 
     // if let Some(cursor_line_buffer) = &cursor_line {

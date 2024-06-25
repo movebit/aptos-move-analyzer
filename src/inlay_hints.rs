@@ -229,11 +229,11 @@ impl Handler {
                 is_visited.push(localvar_loc.span().start().0);
 
                 log::trace!(
-                    "lll >> exp.visit localvar_loc = {:?}",
+                    ">> exp.visit localvar_loc = {:?}",
                     env.get_location(&localvar_loc)
                 );
                 log::trace!(
-                    "lll >> exp.visit localvar_symbol = {}",
+                    ">> exp.visit localvar_symbol = {}",
                     localvar_symbol.display(env.symbol_pool()).to_string()
                 );
                 if let Some(node_type) = env.get_node_type_opt(*node_id) {
