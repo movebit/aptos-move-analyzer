@@ -542,7 +542,7 @@ fn get_package_compile_diagnostics(pkg_path: &Path) -> Result<Diagnostics> {
             match compilation_result {
                 std::result::Result::Ok(_) => {},
                 std::result::Result::Err(diags) => {
-                    log::error!("get_package_compile_diagnostics compilate failed");
+                    log::error!("PASS_TYPING get diags");
                     diagnostics = Some(diags);
                 },
             };

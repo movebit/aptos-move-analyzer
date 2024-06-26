@@ -3,13 +3,14 @@ module Symbols::M1 {
 
     struct SomeStruct has key, drop, store {
         some_field: u64,
+        some_field2: u64,
     }
 
     const SOME_CONST: u64 = 42;
 
 
     fun unpack(s: SomeStruct): u64 {
-        let SomeStruct { some_field: value } = s;
+        let SomeStruct { some_field: value, some_field2: value2 } = s;
         value
     }
 
@@ -19,7 +20,7 @@ module Symbols::M1 {
     }
 
     fun pack(): SomeStruct {
-        let ret = SomeStruct { some_field: SOME_CONST };
+        let ret = SomeStruct { some_field: SOME_CONST, some_field2: 1 };
         ret
     }
 
@@ -42,14 +43,16 @@ module Symbols::M1 {
         multi_arg(SOME_CONST, SOME_CONST)
     }
 
-    fun vec(a:vector<SomeStruct>): vector<SomeStruct> {
-        let s = SomeStruct{ some_field: 7 };
+    fun vec(a:vector<SomeStruct>, b:vector<SomeOtherStruct>): vector<SomeStruct> {
+        let s = SomeStruct{ some_field: 7, some_field2: 1  };
+        let x = s.some_field2;
         a
     }
 
     fun unpack_no_assign(s: SomeStruct): u64 {
         let value: u64;
-        SomeStruct { some_field: value } = s;
+        let value2: u64;
+        SomeStruct { some_field: value, some_field2: value2 } = s;
         value
     }
 

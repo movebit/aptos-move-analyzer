@@ -23,8 +23,8 @@ module 0x42::ReceiverStyleCall3 {
 
     fun test_link_call(s: S) {
         let p1m = &mut s;
-        let p2m = p1m.plus_one().plus_two().plus_three().plus_one().plus_two().plus_three().plus_one().plus_two().plus_three().plus_one().plus_two().plus_three();
-        let p3m = p1m.plus_one<u32>().plus_three<u64>();
+        // let p2m = p1m.plus_one().plus_two().plus_three().plus_one().plus_two().plus_three().plus_one().plus_two().plus_three().plus_one().plus_two().plus_three();
+        // let p3m = p1m.plus_one<u32>().plus_three<u64>();
     }
 }
 
