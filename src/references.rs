@@ -6,6 +6,7 @@ use crate::{
     context::*,
     utils::{path_concat, FileRange},
 };
+use codespan::{ByteIndex, ByteOffset};
 use lsp_server::*;
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
@@ -87,7 +88,6 @@ pub(crate) struct Handler {
     pub(crate) target_module_id: ModuleId,
     pub(crate) target_function_id: Option<FunId>,
     pub(crate) symbol_2_pattern_id: HashMap<Symbol, NodeId>, // LocalVar => Block::Pattern, only remeber the last pattern
-    pub(crate) addrname_2_addrnum: HashMap<String, String>,
 }
 
 impl Handler {
@@ -102,7 +102,6 @@ impl Handler {
             target_module_id: ModuleId::new(0),
             target_function_id: None,
             symbol_2_pattern_id: HashMap::new(),
-            addrname_2_addrnum: HashMap::new(),
         }
     }
 
@@ -250,38 +249,6 @@ impl Handler {
             .collect()
     }
 
-    fn collect_all_select_of_module(
-        &mut self,
-        mod_env: &ModuleEnv,
-        field_name: Symbol,
-    ) -> Vec<FileRange> {
-        let mut result_candidates: Vec<FileRange> = Vec::new();
-        for fun in mod_env.get_functions() {
-            if let Some(exp) = fun.get_def().as_deref() {
-                exp.visit_pre_order(&mut |exp| {
-                    match exp {
-                        Call(node_id, Select(mid, sid, fid), _) => {
-                            let called_module = mod_env.env.get_module(*mid);
-                            let called_struct = called_module.get_struct(*sid);
-                            let called_field = called_struct.get_field(*fid);
-                            // let field_name = called_field.get_name();
-                            // let field_name_str = field_name.display(mod_env.env.symbol_pool());
-                            if field_name == called_field.get_name() {
-                                result_candidates.push(self.convert_loc_to_file_range(
-                                    mod_env.env,
-                                    &mod_env.env.get_node_loc(*node_id),
-                                ));
-                            }
-                        }
-                        _ => {}
-                    }
-                    true
-                });
-            }
-        }
-        result_candidates
-    }
-
     fn process_func(&mut self, env: &GlobalEnv) {
         let mut found_target_fun = false;
         let mut target_fun_id = FunId::new(env.symbol_pool().make("name"));
@@ -345,7 +312,6 @@ impl Handler {
             codespan::Span::new(capture_ty_start, capture_ty_end),
         );
         let ty_source = env.get_source(&capture_ty_loc);
-        log::info!("last para -- 11 ty_source: {:?}", ty_source);
         if let Ok(ty_str) = ty_source {
             let mut colon_vec = vec![];
             let mut r_paren_vec = vec![];
@@ -382,10 +348,6 @@ impl Handler {
                     capture_ty_start,
                     capture_ty_start + codespan::ByteOffset(capture_ty_end_pos as i64),
                 ),
-            );
-            log::info!(
-                "last para -- 22 ty_source: {:?}",
-                env.get_source(&capture_ty_loc)
             );
             if capture_ty_loc.span().end() < self.mouse_span.end() {
                 return;
@@ -693,7 +655,7 @@ impl Handler {
                 if para_string != source_string {
                     continue;
                 }
-                let para_loc = para.2;
+                // let para_loc = para.2;
                 // self.insert_result(env, &para_loc, &source_loc)
             }
         }
@@ -803,11 +765,10 @@ impl Handler {
             let called_field = called_struct.get_field(*fid);
             let field_name = called_field.get_name();
 
-            result_candidates.append(
-                &mut self.collect_all_select_of_module(&called_struct.module_env, field_name),
-            );
+            result_candidates
+                .append(&mut self.find_field_used_of_module(&called_struct.module_env, field_name));
             // for each_mod in env.get_modules() {
-            //     result_candidates.append(&mut self.collect_all_select_of_module(&each_mod, field_name));
+            //     result_candidates.append(&mut self.find_field_used_of_module(&each_mod, field_name));
             // }
 
             let field_name_str = field_name.display(env.symbol_pool());
@@ -887,15 +848,11 @@ impl Handler {
                     .map(|(mat, filed_env)| {
                         if !found_filed
                             && this_call_loc.span().start()
-                                + codespan::ByteOffset(
-                                    mat.start().try_into().unwrap_or_default(),
-                                )
+                                + codespan::ByteOffset(mat.start().try_into().unwrap_or_default())
                                 < self.mouse_span.end()
                             && self.mouse_span.end()
                                 < this_call_loc.span().start()
-                                    + codespan::ByteOffset(
-                                        mat.end().try_into().unwrap_or_default(),
-                                    )
+                                    + codespan::ByteOffset(mat.end().try_into().unwrap_or_default())
                         {
                             log::info!(
                                 "Match mouse field: {}",
@@ -910,7 +867,7 @@ impl Handler {
 
                 if found_filed {
                     let result_candidates =
-                        self.collect_all_select_of_module(&called_module, field_sym);
+                        self.find_field_used_of_module(&called_module, field_sym);
                     log::info!(
                         "Match pack struct field --> result_candidates = {:?}, field_sym = {:?}",
                         result_candidates,
@@ -940,6 +897,7 @@ impl Handler {
                 }
                 if let Some(sym_pattern_node_id) = self.symbol_2_pattern_id.get(sym) {
                     let pattern_loc = env.get_node_loc(*sym_pattern_node_id);
+                    log::info!("Var pattern_loc = {:?}", pattern_loc);
                     // self.insert_result(env, &pattern_loc, &this_call_loc)
                 } else {
                     self.process_temporary_for_function_para(env, &this_call_loc);
@@ -977,7 +935,6 @@ impl Handler {
                 }
                 let pattern_module = env.get_module(q_id.module_id);
                 let pattern_struct = pattern_module.get_struct(q_id.id);
-                let pattern_struct_loc = pattern_struct.get_loc();
                 let mut dist_to_pack_start_pos =
                     this_call_loc.span().end() - this_call_loc.span().start();
                 let mut field_sym: Symbol = pattern_struct.get_name();
@@ -1010,7 +967,7 @@ impl Handler {
 
                 if found_filed {
                     let result_candidates =
-                        self.collect_all_select_of_module(&pattern_module, field_sym);
+                        self.find_field_used_of_module(&pattern_module, field_sym);
                     log::info!(
                         "unpack struct --> result_candidates = {:?}, field_sym = {:?}",
                         result_candidates,
@@ -1136,6 +1093,191 @@ impl Handler {
                 }
             }
         }
+    }
+}
+
+impl Handler {
+    fn find_field_used_of_module(
+        &mut self,
+        mod_env: &ModuleEnv,
+        field_name: Symbol,
+    ) -> Vec<FileRange> {
+        let mut result_candidates: Vec<FileRange> = Vec::new();
+        result_candidates.append(&mut self.collect_all_select_of_module(mod_env, field_name));
+        result_candidates.append(&mut self.collect_all_pack_of_module(mod_env, field_name));
+        result_candidates.append(&mut self.collect_all_unpack_of_module(mod_env, field_name));
+        result_candidates
+    }
+
+    fn collect_all_select_of_module(
+        &mut self,
+        mod_env: &ModuleEnv,
+        field_name: Symbol,
+    ) -> Vec<FileRange> {
+        let mut result_candidates: Vec<FileRange> = Vec::new();
+        for fun in mod_env.get_functions() {
+            if let Some(exp) = fun.get_def().as_deref() {
+                exp.visit_pre_order(&mut |exp| {
+                    match exp {
+                        Call(node_id, Select(mid, sid, fid), _) => {
+                            let called_module = mod_env.env.get_module(*mid);
+                            let called_struct = called_module.get_struct(*sid);
+                            let called_field = called_struct.get_field(*fid);
+                            if field_name == called_field.get_name() {
+                                result_candidates.push(self.convert_loc_to_file_range(
+                                    mod_env.env,
+                                    &mod_env.env.get_node_loc(*node_id),
+                                ));
+                            }
+                        }
+                        _ => {}
+                    }
+                    true
+                });
+            }
+        }
+        result_candidates
+    }
+
+    fn collect_all_pack_of_module(
+        &mut self,
+        mod_env: &ModuleEnv,
+        field_name: Symbol,
+    ) -> Vec<FileRange> {
+        let mut result_candidates: Vec<FileRange> = Vec::new();
+        for fun in mod_env.get_functions() {
+            if let Some(exp) = fun.get_def().as_deref() {
+                exp.visit_pre_order(&mut |exp| {
+                    match exp {
+                        Call(node_id, Pack(mid, sid), _) => {
+                            let mut result_loc = mod_env.env.get_node_loc(*node_id);
+                            if let Ok(pack_struct_str) = mod_env.env.get_source(&result_loc) {
+                                log::info!("pack_struct_str = {:?}", pack_struct_str);
+                                let re = regex::Regex::new(r"\w+\s*:\s").unwrap();
+                                let mut min_match_len = codespan::ByteIndex(10000);
+                                for mat in re.find_iter(pack_struct_str) {
+                                    let field_name_str =
+                                        field_name.display(mod_env.env.symbol_pool()).to_string();
+                                    if mat.as_str().starts_with(&field_name_str) {
+                                        let start_pos = result_loc.span().start()
+                                            + ByteOffset(
+                                                mat.start().try_into().unwrap_or_default(),
+                                            );
+                                        let end_pos = start_pos
+                                            + ByteOffset(
+                                                field_name_str.len().try_into().unwrap_or_default(),
+                                            );
+                                        if min_match_len
+                                            > ByteIndex::default()
+                                                + codespan::ByteOffset((end_pos - start_pos).into())
+                                        {
+                                            min_match_len = ByteIndex::default()
+                                                + codespan::ByteOffset(
+                                                    (end_pos - start_pos).into(),
+                                                );
+                                            result_loc = move_model::model::Loc::new(
+                                                result_loc.file_id(),
+                                                codespan::Span::new(start_pos, end_pos),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+
+                            let called_module = mod_env.env.get_module(*mid);
+                            let called_struct = called_module.get_struct(*sid);
+                            for field in called_struct.get_fields() {
+                                if field_name == field.get_name() {
+                                    result_candidates.push(
+                                        self.convert_loc_to_file_range(mod_env.env, &result_loc),
+                                    );
+                                    break;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                    true
+                });
+            }
+        }
+        result_candidates
+    }
+
+    fn collect_all_unpack_of_module(
+        &mut self,
+        mod_env: &ModuleEnv,
+        field_name: Symbol,
+    ) -> Vec<FileRange> {
+        let mut result_candidates: Vec<FileRange> = Vec::new();
+        for fun in mod_env.get_functions() {
+            if let Some(exp) = fun.get_def().as_deref() {
+                exp.visit_pre_order(&mut |exp| {
+                    match exp {
+                        Block(_, pattern, _, _) | Assign(_, pattern, _) => {
+                            if let MoveModelPattern::Struct(node_id, q_id, _) = pattern {
+                                let mut result_loc = mod_env.env.get_node_loc(*node_id);
+                                if let Ok(unpack_struct_str) = mod_env.env.get_source(&result_loc) {
+                                    log::info!("unpack_struct_str = {:?}", unpack_struct_str);
+                                    let re = regex::Regex::new(r"\w+\s*:\s").unwrap();
+                                    let mut min_match_len = codespan::ByteIndex(10000);
+                                    for mat in re.find_iter(unpack_struct_str) {
+                                        let field_name_str = field_name
+                                            .display(mod_env.env.symbol_pool())
+                                            .to_string();
+                                        if mat.as_str().starts_with(&field_name_str) {
+                                            let start_pos = result_loc.span().start()
+                                                + ByteOffset(
+                                                    mat.start().try_into().unwrap_or_default(),
+                                                );
+                                            let end_pos = start_pos
+                                                + ByteOffset(
+                                                    field_name_str
+                                                        .len()
+                                                        .try_into()
+                                                        .unwrap_or_default(),
+                                                );
+                                            if min_match_len
+                                                > ByteIndex::default()
+                                                    + codespan::ByteOffset(
+                                                        (end_pos - start_pos).into(),
+                                                    )
+                                            {
+                                                min_match_len = ByteIndex::default()
+                                                    + codespan::ByteOffset(
+                                                        (end_pos - start_pos).into(),
+                                                    );
+                                                result_loc = move_model::model::Loc::new(
+                                                    result_loc.file_id(),
+                                                    codespan::Span::new(start_pos, end_pos),
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+
+                                let pattern_module = mod_env.env.get_module(q_id.module_id);
+                                let pattern_struct = pattern_module.get_struct(q_id.id);
+                                for field in pattern_struct.get_fields() {
+                                    if field_name == field.get_name() {
+                                        result_candidates.push(
+                                            self.convert_loc_to_file_range(
+                                                mod_env.env,
+                                                &result_loc,
+                                            ),
+                                        );
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                    true
+                });
+            }
+        }
+        result_candidates
     }
 }
 
