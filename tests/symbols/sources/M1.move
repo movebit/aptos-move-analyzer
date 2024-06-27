@@ -31,6 +31,7 @@ module Symbols::M1 {
     
 
     fun other_mod_struct_import(): SomeOtherStruct {
+        some_other_struct(6);
         some_other_struct(7)
     }
 
@@ -62,17 +63,4 @@ module Symbols::M1 {
         *r = SOME_CONST;
         tmp
     }
-
-
-
-
-
-
-   
-
-
-
-
-
-
 }
