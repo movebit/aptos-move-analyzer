@@ -309,7 +309,6 @@ pub fn on_completion_request(context: &Context, request: &Request) -> lsp_server
     if candidate_modules.is_empty() {
         log::error!("<completion>cannot get target module\n");
     }
-    log::info!("-------------------- 0624 --------------------");
 
     let file_buffer_str = current_project.current_modifing_file_content.as_str();
     let buffer = Some(file_buffer_str);
@@ -363,7 +362,6 @@ pub fn on_completion_request(context: &Context, request: &Request) -> lsp_server
                 &current_project.global_env,
             );
             items.extend_from_slice(&module_items);
-            log::info!("Tok::Period");
         }
         _ => {
             // If the user's cursor is positioned anywhere other than following a `.`, `:`, or `::`,
@@ -392,12 +390,6 @@ pub fn on_completion_request(context: &Context, request: &Request) -> lsp_server
             }
         }
     }
-
-    // if let Some(cursor_line_buffer) = &cursor_line {
-    //     let identifiers = identifiers(cursor_line_buffer.as_str(), &current_project.global_env, &fpath);
-    //     // log::info!("identifiers = {:?}", identifiers);
-    //     items.extend_from_slice(&identifiers);
-    // }
 
     let result = serde_json::to_value(items).expect("could not serialize completion response");
     let response = lsp_server::Response::new_ok(request.id.clone(), result);

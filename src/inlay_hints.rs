@@ -22,15 +22,6 @@ pub fn on_inlay_hints(
     let fpath = parameters.text_document.uri.to_file_path().unwrap();
     let fpath = path_concat(std::env::current_dir().unwrap().as_path(), fpath.as_path());
 
-    // if !inlay_hints_config.enable {
-    //     log::info!("inlay-hints is not enabled.");
-    //     return Response {
-    //         id: "".to_string().into(),
-    //         result: Some(serde_json::json!({"msg": "Inlay-hints is not enabled."})),
-    //         error: None,
-    //     };
-    // }
-
     let mut handler = Handler::new(fpath.clone(), parameters.range);
     match context.projects.get_project(&fpath) {
         Some(x) => x,

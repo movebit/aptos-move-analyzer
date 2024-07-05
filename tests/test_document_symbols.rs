@@ -177,8 +177,6 @@ mod tests {
                 ]
             ),
         );
-        // // std::thread::sleep(Duration::new(1, 0));
-        // log::info!("\n------------------------------\n");
         eprintln!("actual_r = {:?}", actual_r.result);
         eprintln!("\n\n\n");
         // log::trace!("expect_r = {:?}", expect_r);

@@ -48,12 +48,9 @@ The `aptos-move-analyzer` Visual Studio Code extension works via two components:
 
 #### A. Download the precompiled binaries for the aptos-move-analyzer language server(Recommended)
 
-```Windows```  
-> Download [aptos-move-analyzer-win-installer-v0.3.0.msi](https://github.com/movebit/move/releases/tag/aptos-move-analyzer-v0.4.0), and proceed with the installation. This installation program will automatically add the path of `aptos-move-analyzer` to the **PATH** environment variable.
-
 ```MacOS & Ubuntu```
  
- > 1.Download binary files for the corresponding platform from [aptos-move-analyzer-releases-pages](https://github.com/movebit/move/releases/tag/aptos-move-analyzer-v0.5.0).
+ > 1.Download binary files for the corresponding platform from [aptos-move-analyzer-releases-pages](https://github.com/movebit/aptos-move-analyzer/releases/tag/aptos-move-analyzer-v1.0.0).
  >
  > 2.Rename it to `aptos-move-analyzer`. 
  > 
@@ -67,7 +64,7 @@ The `aptos-move-analyzer` language server is a Rust program, so we suggest insta
 
 **Execute the below command to install `aptos_move_analyzer`**
 ```
-cargo install --git https://github.com/movebit/move --branch release/aptos-move-analyzer aptos-move-analyzer
+cargo install --git https://github.com/movebit/aptos-move-analyzer --branch release/aptos-move-analyzer aptos-move-analyzer
 ```
 The installation may take some time, often several minutes. After installation, the `aptos-move-analyzer` program is in your `cargo` binary directory. On macOS and Linux, this directory is usually `~/.cargo/bin`. You should make sure this location is in your `PATH` environment variable via `export PATH="$PATH:~/.cargo/bin"` .
 
@@ -153,6 +150,6 @@ When you first open a project, there will be some dependencies (configured in Mo
 
 ## Support <span id="Support">
 
-1.If you find any issues, please report a GitHub issue to the [movebit/move-analyzer-issue](https://github.com/movebit/move-analyzer-issue) repository to get help.
+1.If you find any issues, please report a GitHub issue to the [aptos-move-analyzer-issues](https://github.com/movebit/aptos-move-analyzer/issues) repository to get help.
 
 2.Welcome to the developer discussion group as well: [MoveAnalyzer](https://t.me/moveanalyzer). 

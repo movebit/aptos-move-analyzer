@@ -25,7 +25,8 @@ use move_model::{
     symbol::Symbol,
 };
 use std::{
-    collections::{BTreeSet, HashMap}, path::{Path, PathBuf}
+    collections::{BTreeSet, HashMap},
+    path::{Path, PathBuf},
 };
 
 /// Handles on_references_request of the language server.
@@ -290,9 +291,14 @@ impl Handler {
         };
     }
 
-    fn process_fn_name(&mut self, env: &GlobalEnv, target_fun: &FunctionEnv) {
+    fn process_fn_name(
+        &mut self,
+        env: &GlobalEnv,
+        capture_loc: &move_model::model::Loc,
+        target_fun: &FunctionEnv,
+    ) {
         let mut result_candidates: Vec<FileRange> = Vec::new();
-        let mut capture_loc = target_fun.get_loc();
+        let mut capture_loc = capture_loc.clone();
         let target_fn_str = target_fun.get_name_str();
         capture_loc = move_model::model::Loc::new(
             capture_loc.file_id(),
@@ -332,6 +338,7 @@ impl Handler {
             self.capture_items_span.push(capture_loc.span());
         }
     }
+
     fn process_parameter(&mut self, env: &GlobalEnv, target_fun: &FunctionEnv) {
         let fun_paras = target_fun.get_parameters();
         log::info!("process_parameter >> fun_paras: {:?}", fun_paras);
@@ -340,7 +347,7 @@ impl Handler {
         for (para_idx, para) in fun_paras.iter().enumerate() {
             if para.2.span().start() > self.mouse_span.end() {
                 if para_idx == 0 {
-                    return self.process_fn_name(env, target_fun);
+                    return self.process_fn_name(env, &target_fun.get_loc(), target_fun);
                 }
                 break;
             }
@@ -352,7 +359,7 @@ impl Handler {
             }
         }
         if fun_paras.is_empty() {
-            return self.process_fn_name(env, target_fun);
+            return self.process_fn_name(env, &target_fun.get_loc(), target_fun);
         }
 
         let para = &fun_paras[correct_para_idx];
@@ -592,8 +599,7 @@ impl Handler {
                     let field_source = env.get_source(&field_loc);
                     if let Ok(atomic_field_str) = field_source {
                         if let Some(index) = atomic_field_str.find("\n".to_string().as_str()) {
-                            let atomic_field_end =
-                                field_start + codespan::ByteOffset(index as i64);
+                            let atomic_field_end = field_start + codespan::ByteOffset(index as i64);
                             let atomic_field_loc = move_model::model::Loc::new(
                                 target_struct_loc.file_id(),
                                 codespan::Span::new(field_start, atomic_field_end),
@@ -726,51 +732,7 @@ impl Handler {
             {
                 let called_module = env.get_module(*mid);
                 let called_fun = called_module.get_function(*fid);
-                log::info!(
-                    "<on_references> -- process_call -- get_called_functions = {:?}",
-                    called_fun.get_full_name_str()
-                );
-
-                if let Some(calling_fns) = called_fun.get_calling_functions() {
-                    let mut result_candidates: Vec<FileRange> = Vec::new();
-                    for caller in calling_fns {
-                        let f = env.get_function(caller);
-                        let mut caller_fun_loc = f.get_loc();
-                        // need locate called_fun.get_full_name_str() in f's body source
-                        let f_source = env.get_source(&caller_fun_loc);
-                        if let Ok(f_source_str) = f_source {
-                            if let Some(index) =
-                                f_source_str.find(called_fun.get_name_str().as_str())
-                            {
-                                let target_len: usize = called_fun.get_name_str().len();
-                                let start = caller_fun_loc.span().start()
-                                    + codespan::ByteOffset(index as i64);
-                                let end =
-                                    start + codespan::ByteOffset(target_len as i64);
-                                caller_fun_loc = move_model::model::Loc::new(
-                                    caller_fun_loc.file_id(),
-                                    codespan::Span::new(start, end),
-                                );
-                            }
-                        }
-                        let (caller_fun_file, caller_fun_line) =
-                            env.get_file_and_location(&caller_fun_loc).unwrap();
-
-                        let result = FileRange {
-                            path: PathBuf::from(caller_fun_file),
-                            line_start: caller_fun_line.line.0,
-                            col_start: caller_fun_line.column.0,
-                            line_end: caller_fun_line.line.0,
-                            col_end: caller_fun_line.column.0
-                                + called_fun.get_name_str().len() as u32,
-                        };
-                        result_candidates.push(result);
-                    }
-                    if !result_candidates.is_empty() {
-                        self.result_ref_candidates.push(result_candidates);
-                        self.capture_items_span.push(this_call_loc.span());
-                    }
-                }
+                self.process_fn_name(env, &this_call_loc, &called_fun);
             }
         }
 
@@ -789,17 +751,7 @@ impl Handler {
                 for callee in spec_fun.callees.clone() {
                     let module = env.get_module(callee.module_id);
                     let decl = module.get_spec_fun(callee.id);
-
-                    let (caller_fun_file, caller_fun_line) =
-                        env.get_file_and_location(&decl.loc).unwrap();
-                    let result = FileRange {
-                        path: PathBuf::from(caller_fun_file),
-                        line_start: caller_fun_line.line.0,
-                        col_start: caller_fun_line.column.0,
-                        line_end: caller_fun_line.line.0,
-                        col_end: caller_fun_line.column.0,
-                    };
-                    result_candidates.push(result);
+                    result_candidates.push(self.convert_loc_to_file_range(env, &decl.loc));
                 }
                 if !result_candidates.is_empty() {
                     self.result_ref_candidates.push(result_candidates);
@@ -822,7 +774,6 @@ impl Handler {
             let mut result_candidates: Vec<FileRange> = Vec::new();
             let called_module = env.get_module(*mid);
             let called_struct = called_module.get_struct(*sid);
-            log::trace!(">> called_struct = {:?}", called_struct.get_full_name_str());
             let called_field = called_struct.get_field(*fid);
             let field_name = called_field.get_name();
 
@@ -831,26 +782,6 @@ impl Handler {
             // for each_mod in env.get_modules() {
             //     result_candidates.append(&mut self.find_field_used_of_module(&each_mod, field_name));
             // }
-
-            let field_name_str = field_name.display(env.symbol_pool());
-
-            let called_struct_loc = called_struct.get_loc();
-            let call_struct_source = env.get_source(&called_struct_loc);
-            if let Ok(call_struct_str) = call_struct_source {
-                if let Some(index) = call_struct_str.find(field_name_str.to_string().as_str()) {
-                    let field_start = called_struct_loc.span().start()
-                        + codespan::ByteOffset(index as i64);
-                    let field_len = field_name_str.to_string().len();
-                    let field_end =
-                        field_start + codespan::ByteOffset(field_len as i64);
-                    let field_loc = move_model::model::Loc::new(
-                        called_struct_loc.file_id(),
-                        codespan::Span::new(field_start, field_end),
-                    );
-                    log::info!("field_loc = {:?}", env.get_source(&field_loc));
-                    result_candidates.push(self.convert_loc_to_file_range(env, &field_loc));
-                }
-            }
             if !result_candidates.is_empty() {
                 self.result_ref_candidates.push(result_candidates);
                 self.capture_items_span.push(this_call_loc.span());
@@ -1085,18 +1016,17 @@ impl Handler {
                         if let Some(index) =
                             stc_ref_fn_source.find(mouse_capture_ty_symbol_str.as_str())
                         {
-                            let capture_ref_ty_start = stc_ref_fn_loc.span().start()
-                                + codespan::ByteOffset(index as i64);
+                            let capture_ref_ty_start =
+                                stc_ref_fn_loc.span().start() + codespan::ByteOffset(index as i64);
                             let capture_ref_ty_end = capture_ref_ty_start
-                                + codespan::ByteOffset(
-                                    mouse_capture_ty_symbol_str.len() as i64,
-                                );
+                                + codespan::ByteOffset(mouse_capture_ty_symbol_str.len() as i64);
 
                             let result_loc = move_model::model::Loc::new(
                                 stc_ref_fn_loc.file_id(),
                                 codespan::Span::new(capture_ref_ty_start, capture_ref_ty_end),
                             );
-                            result_candidates.push(self.convert_loc_to_file_range(env, &result_loc));
+                            result_candidates
+                                .push(self.convert_loc_to_file_range(env, &result_loc));
                             stc_ref_fn_loc = move_model::model::Loc::new(
                                 stc_ref_fn_loc.file_id(),
                                 codespan::Span::new(
