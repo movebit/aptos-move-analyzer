@@ -49,7 +49,7 @@ The `aptos-move-analyzer` Visual Studio Code extension works via two components:
 
 ```MacOS & Ubuntu```
  
- > 1.Download binary files for the corresponding platform from [aptos-move-analyzer-releases-pages](https://github.com/movebit/aptos-move-analyzer/releases/tag/aptos-move-analyzer-v1.0.0).
+ > 1.Download binary files for the corresponding platform from [aptos-move-analyzer-releases-pages](https://github.com/movebit/aptos-move-analyzer/releases/tag/v1.0.0).
  >
  > 2.Rename it to `aptos-move-analyzer`. 
  > 
