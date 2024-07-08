@@ -5,15 +5,15 @@
 	"publisher": "MoveBit",
 	"icon": "images/move.png",
 	"license": "Apache-2.0",
-	"version": "0.9.0",
-	"preview": true,
-	"homepage": "https://github.com/move-language/move",
+	"version": "0.9.3",
+	"preview": false,
+	"homepage": "https://github.com/movebit/aptos-move-analyzer",
 	"repository": {
-		"url": "https://github.com/move-language/move.git",
+		"url": "https://github.com/movebit/aptos-move-analyzer.git",
 		"type": "git"
 	},
 	"bugs": {
-		"url": "https://github.com/move-language/move/issues"
+		"url": "https://github.com/movebit/aptos-move-analyzer/issues"
 	},
 	"engines": {
 		"vscode": "^1.85.0"

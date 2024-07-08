@@ -3,6 +3,7 @@
 **Table of Contents**
 * [Introduction](#Introduction)
 * [Features](#Features)
+* [Changelog](#Changelog)
 * [Installation](#Installation)
 * [Support](#Support)
 
@@ -28,6 +29,9 @@ Move source file (a file with a `.move` file extension) and:
   - inlay hints
   - formatter for move file
   - ...
+
+## Changelog <span id="Changelog">
+[Changelog](https://github.com/movebit/aptos-move-analyzer/blob/release/aptos-move-analyzer/editors/CHANGELOG.md)
 
 ## Installation <span id="Installation">
 
