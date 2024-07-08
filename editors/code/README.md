@@ -8,7 +8,7 @@
 
 
 ## Introduction <span id="Introduction">
-The **aptos-move-analyzer** is a Visual Studio Code plugin for **Aptos Move** language developed by [MoveBit](https://movebit.xyz). Although this is an alpha release, it has many useful features, such as **highlight, autocomplete, go to definition/references**, and so on.
+The **aptos-move-analyzer** is a Visual Studio Code plugin for **Aptos Move** language developed by [MoveBit](https://movebit.xyz).
 
 ## Features <span id="Features">
 
@@ -26,7 +26,6 @@ Move source file (a file with a `.move` file extension) and:
   - go to references
   - type on hover
   - inlay hints
-  - linter for move file
   - formatter for move file
   - ...
 
@@ -69,7 +68,7 @@ cargo install --git https://github.com/movebit/aptos-move-analyzer --branch rele
 The installation may take some time, often several minutes. After installation, the `aptos-move-analyzer` program is in your `cargo` binary directory. On macOS and Linux, this directory is usually `~/.cargo/bin`. You should make sure this location is in your `PATH` environment variable via `export PATH="$PATH:~/.cargo/bin"` .
 
 To confirm that you've installed the language server program successfully, execute
-`aptos-move-analyzer --version` on the command line. You should see the output `aptos-move-analyzer version number(0.5.0)`.
+`aptos-move-analyzer --version` on the command line. You should see the output `aptos-move-analyzer version number(1.0.0)`.
 If you don't see it, check the troubleshooting section at the end.
 
 After completing the above steps, **restart** VSCode.
