@@ -5,7 +5,7 @@
 	"publisher": "MoveBit",
 	"icon": "images/move.png",
 	"license": "Apache-2.0",
-	"version": "0.9.3",
+	"version": "1.0.0",
 	"preview": false,
 	"homepage": "https://github.com/movebit/aptos-move-analyzer",
 	"repository": {
