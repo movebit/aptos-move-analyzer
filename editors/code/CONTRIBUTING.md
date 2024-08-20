@@ -6,7 +6,7 @@ To begin contributing to the VS Code extension for Move, you'll need to have som
 
 1. Visual Studio Code itself. To install, follow the directions on [the VS Code website](https://code.visualstudio.com).
 2. Node.js and its package manager, NPM. To install, follow the directions on [the Node.js website](https://nodejs.org/en/).
-3. The Node module dependencies this extension relies upon. To install, make sure you have Node.js and NPM installed, then open your favorite terminal app. Navigate to the extension's directory and install its dependencies using `npm install`. In short: `cd language/move-analyzer/editors/code && npm install`.
+3. The Node module dependencies this extension relies upon. To install, make sure you have Node.js and NPM installed, then open your favorite terminal app. Navigate to the extension's directory and install its dependencies using `npm install`. In short: `cd editors/code && npm install`.
 
 > If you'll be using [VS Code Remote Development](https://code.visualstudio.com/docs/remote/remote-overview) to connect to a computer over SSH, install Node.js on the computer you'll be connecting to.
 
@@ -60,7 +60,7 @@ To be added to the group of maintainers allowed to release new versions of the m
 
 1. Open https://marketplace.visualstudio.com/vscode in your browser and click on "Sign in" on the upper-right of the page.
 2. Sign in with your Microsoft account's email address. If using a corporate email address, you'll go through an authentication flow specific to your organization (two-factor authentication, for example).
-3. Once you've signed in, contact someone who is already in the existing group of maintainers, and ask them to [please add you to this list of members](https://marketplace.visualstudio.com/manage/publishers/move). If you do not know anyone in this group personally, run `git log -- language/move-analyzer/editors/code` and send an email to one or more of the people who have committed to this directory.
+3. Once you've signed in, contact someone who is already in the existing group of maintainers, and ask them to [please add you to this list of members](https://marketplace.visualstudio.com/manage/publishers/move). If you do not know anyone in this group personally, run `git log -- editors/code` and send an email to one or more of the people who have committed to this directory.
 
 Once you've been added, confirm that you are able to access [the `move` publisher page](https://marketplace.visualstudio.com/manage/publishers/move). If you can see yourself listed in the "Members" tab, then you have successfully been added to the publisher team.
 

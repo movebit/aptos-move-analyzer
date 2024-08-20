@@ -8,60 +8,15 @@ import { Extension } from './extension';
 import { log } from './log';
 import { Reg } from './reg';
 import * as vscode from 'vscode';
-// import * as lc from "vscode-languageclient/node";
+import { downloadLsp } from "./download";
+import { getLatestVersion, getLspPath, getVersionFromMetaFile } from "./util";
 
-// class ExperimentalFeatures implements lc.StaticFeature {
-//   fillInitializeParams?: (params: lc.InitializeParams) => void;
-//   preInitialize?: (capabilities: lc.ServerCapabilities<any>, documentSelector: lc.DocumentSelector | undefined) => void;
-//   clear(): void {
-//     throw new Error('Method not implemented.');
-//   }
-//   getState(): lc.FeatureState {
-//       return { kind: "static" };
-//   }
 
-//   fillClientCapabilities(capabilities: lc.ClientCapabilities): void {
-//       capabilities.workspace = {
-//         inlayHint: {
-//           refreshSupport: true
-//         }
-//       };
-//       capabilities.textDocument = {
-//         formatting: {
-//           dynamicRegistration: true
-//         },
-//         inlayHint: {
-//           dynamicRegistration: true,
-//           resolveSupport: {
-//             properties: []
-//           },
-//         }
-//       };
-//       capabilities.experimental = {
-//           snippetTextEdit: true,
-//           codeActionGroup: true,
-//           hoverActions: true,
-//           serverStatusNotification: true,
-//           colorDiagnosticOutput: true,
-//           openServerLogs: true,
-//           commands: {
-//               commands: [
-//                   "editor.action.triggerParameterHints",
-//               ],
-//           },
-//           ...capabilities.experimental,
-//       };
-//   }
-//   initialize(
-//       _capabilities: lc.ServerCapabilities,
-//       _documentSelector: lc.DocumentSelector | undefined,
-//   ): void {}
-//   dispose(): void {}
-// }
-
+let extensionContext: vscode.ExtensionContext;
 export async function activate(
   extensionContext: Readonly<vscode.ExtensionContext>,
 ): Promise<void> {
+  extensionContext = extensionContext;
   const extension = new Extension();
   log.info(`${extension.identifier} version ${extension.version}`);
 
@@ -79,39 +34,21 @@ export async function activate(
     return;
   }
 
-  // const d = vscode.languages.registerInlayHintsProvider(
-  //   { scheme: 'file', language: 'move' },
-  //   {
-  //     provideInlayHints(document, range) {
-  //       const client = context.getClient();
-  //       if (client === undefined) {
-  //         return undefined;
-  //       }
-  //       const hints = client.sendRequest<vscode.InlayHint[]>('textDocument/inlayHint',
-  //         { range: range, textDocument: { uri: document.uri.toString() } });
-  //       return hints;
-  //     },
-  //   },
-  // );
-
-
   // Configure other language features.
   context.configureLanguage();
+
+  await maybeDownloadLspServer();
+  if (analyzerLspPath === undefined) {
+    return;
+  }
 
   // All other utilities provided by this extension occur via the language server.
   // await context.startClient();
   context.startClient();
+  updateStatus("starting");
 
   // Regist all the aptos commands.
   Reg.regaptos(context);
-  // {
-  //   const client = context.getClient();
-  //   if (client != undefined) {
-  //     log.info("registerFeature ExperimentalFeatures");
-  //     client.registerFeature(new ExperimentalFeatures());
-  //   }
-  // }
-  // extensionContext.subscriptions.push(d);
 
   const reload_cfg = function(): any {
     const client = context.getClient();
@@ -127,4 +64,184 @@ export async function activate(
     log.info('reload_cfg ...  ');
     reload_cfg();
   });
+}
+
+// import {
+//   LanguageClient,
+//   LanguageClientOptions,
+//   ServerOptions,
+//   TransportKind,
+// } from "vscode-languageclient/node";
+
+// let activeClient: LanguageClient | undefined;
+export type LspStatus =
+  | "stopped"
+  | "starting"
+  | "started"
+  | "downloading"
+  | "error";
+
+let currentStatus: LspStatus = "stopped";
+let extensionStatus: vscode.StatusBarItem;
+let analyzerLspPath: string | undefined;
+
+function updateStatus(status: LspStatus, extraInfo?: string) {
+  currentStatus = status;
+  switch (currentStatus) {
+    case "starting":
+      updateStatusBar(true, false, "LSP Starting");
+      break;
+    case "downloading":
+      updateStatusBar(true, false, `LSP Downloading - ${extraInfo}`);
+      break;
+    case "error":
+      updateStatusBar(false, true, "LSP Startup Error");
+      break;
+    default:
+      updateStatusBar(false, false);
+      break;
+  }
+}
+
+/**
+ * Get the current status of the LSP.
+ * @returns A string representing the current status of the LSP, one of "stopped", "starting", "started", "downloading", or "error".
+ */
+export function getLspStatus(): LspStatus {
+  return currentStatus;
+}
+
+function updateStatusBar(
+  workInProgress: boolean,
+  errorOccurred: boolean,
+  text?: string,
+): void {
+  const statusItem = extensionStatus;
+  statusItem.show();
+  statusItem.tooltip = new vscode.MarkdownString(text, true);
+  statusItem.tooltip.isTrusted = true;
+
+  if (workInProgress) {
+    statusItem.backgroundColor = new vscode.ThemeColor(
+      "statusBarItem.infoForeground",
+    );
+  } else {
+    statusItem.backgroundColor = undefined;
+  }
+
+  if (errorOccurred) {
+    statusItem.backgroundColor = new vscode.ThemeColor(
+      "statusBarItem.errorForeground",
+    );
+  } else {
+    statusItem.backgroundColor = undefined;
+  }
+
+  // tooltip
+  statusItem.tooltip.appendMarkdown("**General**");
+  statusItem.tooltip.appendMarkdown("\n\n---\n\n");
+  statusItem.tooltip.appendMarkdown(
+    `\n\n[Open Extension Logs](command:analyzer.openLogs)`,
+  );
+
+  statusItem.tooltip.appendMarkdown("\n\n**LSP**");
+  statusItem.tooltip.appendMarkdown("\n\n---\n\n");
+  if (getLspStatus() === "started" || getLspStatus() === "error") {
+    statusItem.tooltip.appendMarkdown(
+      `\n\n[Restart Server](command:analyzer.lsp.restart)`,
+    );
+  } else if (getLspStatus() === "stopped") {
+    statusItem.tooltip.appendMarkdown(
+      `\n\n[Start Server](command:analyzer.lsp.start)`,
+    );
+  }
+  if (
+    getLspStatus() !== "stopped" &&
+    getLspStatus() !== "downloading" &&
+    getLspStatus() !== "error"
+  ) {
+    statusItem.tooltip.appendMarkdown(
+      `\n\n[Stop Server](command:analyzer.lsp.stop)`,
+    );
+  }
+
+}
+
+
+import * as path from "path";
+import * as fs from "fs";
+// import * as process from "process";
+
+
+async function ensureServerDownloaded(): Promise<string | undefined> {
+  const installedVersion = getVersionFromMetaFile(
+    extensionContext.extensionPath,
+  );
+  // const configuredVersion = getConfig().analyzerLspVersion;
+
+  // See if we have the right version
+  // - either its the latest
+  // - or we have the one that's configured
+  let versionToDownload = "";
+  {
+    const latestVersion = await getLatestVersion();
+    if (latestVersion !== installedVersion) {
+      versionToDownload = latestVersion;
+    } else {
+      // Check that the file wasn't unexpectedly removed
+      const lspPath = getLspPath(
+        extensionContext.extensionPath,
+        installedVersion,
+      );
+      if (lspPath === undefined) {
+        versionToDownload = latestVersion;
+      } else {
+        return lspPath;
+      }
+    }
+  }
+
+  // Install the LSP and update the version metadata file
+  updateStatus("downloading", versionToDownload);
+  const newLspPath = await downloadLsp(
+    extensionContext.extensionPath,
+    versionToDownload,
+  );
+  if (newLspPath === undefined) {
+    updateStatus("error");
+  } else {
+    updateStatus("stopped");
+  }
+  return newLspPath;
+}
+
+async function maybeDownloadLspServer(): Promise<void> {
+  const configuration = new Configuration();
+  const userConfiguredAnalyzerLspPath = configuration.serverPath;
+  if (
+    userConfiguredAnalyzerLspPath !== "" &&
+    userConfiguredAnalyzerLspPath !== undefined
+  ) {
+    const userConfiguredAnalyzerLspPath = "";
+    // Copy the binary to the extension directory so it doesn't block future compilations
+    const lspPath = path.join(
+      extensionContext.extensionPath,
+      `analyzer-lsp-local.bin`,
+    );
+    // Check that the LSP is statically linked, we can assume
+    // this from the file size (if it's less than 4mb, conservatively it ain't statically linked)
+    const stats = fs.statSync(userConfiguredAnalyzerLspPath);
+    const fileSizeInBytes = stats.size;
+    const fileSizeInMegabytes = fileSizeInBytes / (1024 * 1024);
+    if (fileSizeInMegabytes <= 4) {
+      vscode.window.showErrorMessage(
+        "Local LSP path does not appear to point to a statically linked binary",
+      );
+      return;
+    }
+    fs.copyFileSync(userConfiguredAnalyzerLspPath, lspPath);
+    analyzerLspPath = lspPath;
+  } else {
+    analyzerLspPath = await ensureServerDownloaded();
+  }
 }

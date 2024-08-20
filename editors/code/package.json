@@ -202,6 +202,7 @@
 	"devDependencies": {
 		"@tsconfig/strictest": "^2.0.1",
 		"@types/command-exists": "^1.2.0",
+		"@types/follow-redirects": "^1.14.4",
 		"@types/fs-extra": "^9.0.13",
 		"@types/mocha": "^9.0.0",
 		"@types/node": "~20.11.7",
@@ -215,6 +216,7 @@
 		"esbuild": "^0.18.12",
 		"eslint": "^7.32.0",
 		"eslint-plugin-tsdoc": "^0.2.14",
+		"follow-redirects": "^1.15.6",
 		"fs-extra": "10.0.1",
 		"mocha": "^9.1.1",
 		"typescript": "^5.1.6",
