@@ -2,11 +2,12 @@ import { fetchFromUrl } from "./utils/download";
 import * as path from "path";
 import * as fs from "fs";
 import * as process from "process";
+import { log } from "./log";
 
 const artifactNameTemplates: any = {
-  darwin: undefined,
-  linux: "analyzer-lsp-linux-__VERSION__.bin",
-  win32: "analyzer-lsp-windows-__VERSION__.exe",
+  darwin: "aptos-move-analyzer-mac-x86_64-__VERSION__",
+  linux: "aptos-move-analyzer-ubuntu20.04-x86_64-__VERSION__",
+  win32: "aptos-move-analyzer-windows-x86_64-__VERSION__",
 };
 
 const versionFileName = "lsp-metadata.json";
@@ -16,12 +17,12 @@ export function getLspReleaseAssetName(
   platform: string = process.platform,
 ): string | undefined {
   if (!(platform in artifactNameTemplates)) {
-    console.log(`Unsupported platform '${platform}'`);
+    log.info(`Unsupported platform '${platform}'`);
     return undefined;
   }
   const nameTemplate = artifactNameTemplates[platform];
   if (nameTemplate === undefined) {
-    console.log(`Unsupported platform '${platform}'`);
+    log.info(`Unsupported platform '${platform}'`);
     return undefined;
   }
 
@@ -31,7 +32,7 @@ export function getLspReleaseAssetName(
 export async function getLatestVersion(): Promise<string> {
   try {
     const releasesJSON = await fetchFromUrl(
-      "https://api.github.com/repos/open-goal/jak-project/releases",
+      "https://api.github.com/repos/movebit/aptos-move-analyzer/releases",
     );
     const releases = JSON.parse(releasesJSON);
     return releases[0].tag_name;
@@ -46,6 +47,7 @@ export function getLspPath(
 ): string | undefined {
   const lspName = getLspReleaseAssetName(version);
   if (lspName === undefined) {
+    log.info('getLspPath = undefined');
     return undefined;
   }
   const filePath = path.join(extensionPath, lspName);
@@ -61,7 +63,7 @@ export function getVersionFromMetaFile(extensionPath: string): string {
     const meta = JSON.parse(fs.readFileSync(filePath, "utf8"));
     return meta.version;
   } catch (e: any) {
-    console.log("Could not read lsp metadata version file.", e.message);
+    log.info("Could not read lsp metadata version file." + e.message);
     return "";
   }
 }
@@ -76,6 +78,6 @@ export function writeLspMetadata(extensionPath: string, version: string): void {
       }),
     );
   } catch (e: any) {
-    console.log("Could not write lsp metadata file.", e.message);
+    log.info("Could not write lsp metadata file." + e.message);
   }
 }

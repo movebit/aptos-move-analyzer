@@ -1,6 +1,7 @@
 import * as url from "url";
 import { https } from "follow-redirects";
 import * as fs from "fs";
+import { log } from "../log";
 
 export async function fetchFromUrl(fullUrl: string): Promise<string> {
   const q = url.parse(fullUrl);
@@ -34,7 +35,7 @@ export async function downloadFromUrl(
   url: string,
   filePath: string,
 ): Promise<void> {
-  console.log("Downloading file from", url);
+  log.info("Downloading file from " + url);
   return new Promise((resolve, reject) => {
     https
       .get(url, (response) => {
@@ -43,7 +44,7 @@ export async function downloadFromUrl(
           response
             .on("end", () => {
               writeStream.close();
-              console.log("file downloaded to", filePath);
+              log.info("file downloaded to " + filePath);
               resolve();
             })
             .pipe(writeStream);
