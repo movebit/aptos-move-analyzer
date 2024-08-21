@@ -31,29 +31,102 @@ export async function fetchFromUrl(fullUrl: string): Promise<string> {
   });
 }
 
+import * as https_v2 from "https";
+import { HttpsProxyAgent } from "https-proxy-agent";
+
 export async function downloadFromUrl(
   url: string,
   filePath: string,
+  timeout: number = 10000, // default 10s
+  proxy?: string
 ): Promise<void> {
   log.info("Downloading file from " + url);
+
   return new Promise((resolve, reject) => {
-    https
-      .get(url, (response) => {
-        if (response.statusCode === 200) {
-          const writeStream = fs.createWriteStream(filePath);
-          response
-            .on("end", () => {
-              writeStream.close();
-              log.info("file downloaded to " + filePath);
-              resolve();
-            })
-            .pipe(writeStream);
-        } else {
-          response.resume(); // Consume response to free up memory
-          reject(new Error(response.statusMessage));
-        }
-      })
-      .on("error", reject);
+    const options: https_v2.RequestOptions = {};
+    if (proxy) {
+      const agent = new HttpsProxyAgent(proxy);
+      options.agent = agent;
+    }
+
+    const request = https_v2.get(url, options, (response) => {
+      if (response.statusCode === 200) {
+        const writeStream = fs.createWriteStream(filePath);
+        response
+          .on("end", () => {
+            writeStream.close();
+            log.info("File downloaded to " + filePath);
+            resolve();
+          })
+          .pipe(writeStream);
+      } else {
+        log.info("File downloaded fail: " + response.statusCode + " " + response.statusMessage);
+        response.resume(); // Consume response to free up memory
+        reject(new Error(response.statusMessage));
+      }
+    });
+
+    request.on("error", reject);
+
+    request.setTimeout(timeout, () => {
+      request.abort();
+      reject(new Error(`Request timed out after ${timeout} ms`));
+    });
   });
 }
+
+// export async function downloadFromUrl_v2(
+//   url: string,
+//   filePath: string,
+//   timeout: number = 30000, // default 30s
+//   proxy?: string,
+//   maxRedirects: number = 5
+// ): Promise<void> {
+//   // url = "https://filesampleshub.com/download/document/txt/sample2.txt";
+//   log.info("Downloading file from " + url);
+  
+//   return new Promise((resolve, reject) => {
+//     const options: https_v2.RequestOptions = {};
+
+//     if (proxy) {
+//       const agent = new HttpsProxyAgent(proxy);
+//       options.agent = agent;
+//       options.rejectUnauthorized = false;
+//     }
+
+//     const request = https_v2.get(url, options, (response) => {
+//       if (response.statusCode === 200) {
+//         const writeStream = fs.createWriteStream(filePath);
+//         response
+//           .on("end", () => {
+//             writeStream.close();
+//             log.info("File downloaded to " + filePath);
+//             resolve();
+//           })
+//           .pipe(writeStream);
+//       } else if (response.statusCode === 302 && response.headers.location) {
+//         // process redirecting
+//         if (maxRedirects > 0) {
+//           log.info("Redirecting to " + response.headers.location);
+//           // Recursively call oneself, follow redirection
+//           downloadFromUrl(response.headers.location, filePath, timeout, proxy, maxRedirects - 1)
+//             .then(resolve)
+//             .catch(reject);
+//         } else {
+//           reject(new Error("Too many redirects"));
+//         }
+//       } else {
+//         response.resume(); // Consume response to free up memory
+//         reject(new Error(`Request failed with status code ${response.statusCode}: ${response.statusMessage}`));
+//       }
+//     });
+
+//     request.on("error", reject);
+
+//     request.setTimeout(timeout, () => {
+//       request.abort();
+//       reject(new Error(`Request timed out after ${timeout} ms`));
+//     });
+//   });
+// }
 

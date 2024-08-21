@@ -17,12 +17,21 @@ export async function downloadLsp(
   const savePath = path.join(extensionPath, assetName);
   log.info('savePath = ' + savePath);
   try {
-    await downloadFromUrl(url, savePath);
+    await downloadFromUrl(
+      url,
+      savePath,
+      6000,
+    );
+    // await downloadFromUrl_v2(
+    //   url,
+    //   savePath,
+    //   6000,
+    //   "https://127.0.0.1:7890",
+    //   10
+    // );
+
     log.info('after downloadFromUrl');
     fs.chmodSync(savePath, 0o775);
-    // if (path.extname(savePath) === ".bin") {
-    //   fs.chmodSync(savePath, 0o775);
-    // }
     writeLspMetadata(extensionPath, version);
   } catch (e: any) {
     log.info("catch Error downloading aptos-move-analyzer" + e);

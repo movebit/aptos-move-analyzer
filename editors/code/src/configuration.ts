@@ -5,6 +5,7 @@
 import * as os from 'os';
 import * as vscode from 'vscode';
 import * as Path from 'path';
+import { log } from './log';
 
 class InlayHintsConfig {
     public enable: boolean;
@@ -56,12 +57,14 @@ class Configuration {
             // The default value of the `server.path` setting is 'aptos-move-analyzer'.
             // A user may have over-written this default with an empty string value, ''.
             // An empty string cannot be an executable name, so instead use the default.
+            log.info('serverPath is empty');
             return defaultName;
         }
 
         if (serverPath === defaultName) {
             // If the program set by the user is through PATH,
             // it will return directly if specified
+            log.info('serverPath === defaultName');
             return defaultName;
         }
 

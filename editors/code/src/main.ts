@@ -7,6 +7,7 @@ import { Context } from './context';
 import { Extension } from './extension';
 import { log } from './log';
 import { Reg } from './reg';
+import * as os from 'os';
 import * as path from "path";
 import * as fs from "fs";
 import * as vscode from 'vscode';
@@ -33,6 +34,11 @@ export async function activate(
   const configuration = new Configuration();
   log.info(`configuration: ${configuration.toString()}`);
 
+  await maybeDownloadLspServer();
+  if (analyzerLspPath === undefined) {
+    return;
+  }
+
   const context = Context.create(extensionContext, configuration);
   // An error here -- for example, if the path to the `aptos-move-analyzer` binary that the user
   // specified in their settings is not valid -- prevents the extension from providing any
@@ -51,14 +57,10 @@ export async function activate(
   // Configure other language features.
   context.configureLanguage();
 
-  await maybeDownloadLspServer();
-  if (analyzerLspPath === undefined) {
-    return;
-  }
-
+  updateStatus("starting");
   context.startClient();
   log.info('after started client');
-  updateStatus("starting");
+  updateStatus("started");
 
   // Regist all the aptos commands.
   Reg.regaptos(context);
@@ -164,9 +166,8 @@ function updateStatusBar(
 
 async function ensureServerDownloaded(): Promise<string | undefined> {
   const installedVersion = getVersionFromMetaFile(
-    "~/.cargo/bin",
+    os.homedir() + "/.cargo/bin/",
   );
-  // const configuredVersion = getConfig().analyzerLspVersion;
 
   // See if we have the right version
   // - either its the latest
@@ -179,9 +180,11 @@ async function ensureServerDownloaded(): Promise<string | undefined> {
   } else {
     // Check that the file wasn't unexpectedly removed
     const lspPath = getLspPath(
-      "~/.cargo/bin",
+      os.homedir() + "/.cargo/bin/",
       installedVersion,
     );
+    log.info('installedVersion = ' + installedVersion);
+    log.info('lspPath = ' + lspPath);
     if (lspPath === undefined) {
       versionToDownload = latestVersion;
     } else {
@@ -193,7 +196,7 @@ async function ensureServerDownloaded(): Promise<string | undefined> {
   // Install the LSP and update the version metadata file
   updateStatus("downloading", versionToDownload);
   const newLspPath = await downloadLsp(
-    "~/.cargo/bin",
+    os.homedir() + "/.cargo/bin/",
     versionToDownload,
   );
   if (newLspPath === undefined) {
@@ -205,17 +208,16 @@ async function ensureServerDownloaded(): Promise<string | undefined> {
 }
 
 async function maybeDownloadLspServer(): Promise<void> {
+  const lspPath = path.join(
+    os.homedir() + "/.cargo/bin/",
+    `aptos-move-analyzer`,
+  );
   const configuration = new Configuration();
   const userConfiguredAnalyzerLspPath = configuration.serverPath;
   log.info('userConfiguredAnalyzerLspPath = ' + userConfiguredAnalyzerLspPath);
   if (
     userConfiguredAnalyzerLspPath !== "aptos-move-analyzer"
   ) {
-    // Copy the binary to the extension directory so it doesn't block future compilations
-    const lspPath = path.join(
-      "/Users/edy/.cargo/bin",
-      `aptos-move-analyzer.d`,
-    );
     // Check that the LSP is statically linked, we can assume
     // this from the file size (if it's less than 1mb, conservatively it ain't statically linked)
     log.info('before stat file');
@@ -234,6 +236,9 @@ async function maybeDownloadLspServer(): Promise<void> {
   } else {
     log.info('before ensureServerDownloaded');
     analyzerLspPath = await ensureServerDownloaded();
+    if (analyzerLspPath !== undefined) {
+      fs.copyFileSync(analyzerLspPath, lspPath);
+    }
     log.info('analyzerLspPath = ' + analyzerLspPath);
   }
 }
