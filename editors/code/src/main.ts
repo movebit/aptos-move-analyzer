@@ -22,7 +22,7 @@ export type LspStatus =
   | "error";
 
 let currentStatus: LspStatus = "stopped";
-let extensionStatus: vscode.StatusBarItem;
+// let extensionStatus: vscode.StatusBarItem;
 let analyzerLspPath: string | undefined;
 
 export async function activate(
@@ -35,6 +35,7 @@ export async function activate(
   log.info(`configuration: ${configuration.toString()}`);
 
   await maybeDownloadLspServer();
+  log.info('after maybeDownloadLspServer');
   if (analyzerLspPath === undefined) {
     return;
   }
@@ -49,10 +50,10 @@ export async function activate(
     );
     return;
   }
-  extensionStatus = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Left,
-    0,
-  );
+  // extensionStatus = vscode.window.createStatusBarItem(
+  //   vscode.StatusBarAlignment.Left,
+  //   0,
+  // );
 
   // Configure other language features.
   context.configureLanguage();
@@ -112,6 +113,11 @@ function updateStatusBar(
   errorOccurred: boolean,
   text?: string,
 ): void {
+  log.info('update workInProgress = ' + workInProgress);
+  log.info('update errorOccurred = ' + errorOccurred);
+  log.info('update status = ' + text);
+  return;
+  /*
   let statusIcon = "";
   const statusItem = extensionStatus;
   statusItem.show();
@@ -162,6 +168,7 @@ function updateStatusBar(
       `\n\n[Stop Server](command:aptos.move.analyzer.lsp.stop)`,
     );
   }
+  */
 }
 
 async function ensureServerDownloaded(): Promise<string | undefined> {
@@ -192,7 +199,7 @@ async function ensureServerDownloaded(): Promise<string | undefined> {
     }
   }
   log.info('versionToDownload = ' + versionToDownload);
-
+  log.info('Install the LSP and update the version metadata file');
   // Install the LSP and update the version metadata file
   updateStatus("downloading", versionToDownload);
   const newLspPath = await downloadLsp(
@@ -202,16 +209,20 @@ async function ensureServerDownloaded(): Promise<string | undefined> {
   if (newLspPath === undefined) {
     updateStatus("error");
   } else {
+    log.info('newLspPath 0827 = ' + newLspPath);
     updateStatus("stopped");
   }
   return newLspPath;
 }
 
 async function maybeDownloadLspServer(): Promise<void> {
-  const lspPath = path.join(
+  var dest_server_path = path.join(
     os.homedir() + "/.cargo/bin/",
     `aptos-move-analyzer`,
   );
+  if (process.platform === 'win32') {
+    dest_server_path = dest_server_path + '.exe';
+  }
   const configuration = new Configuration();
   const userConfiguredAnalyzerLspPath = configuration.serverPath;
   log.info('userConfiguredAnalyzerLspPath = ' + userConfiguredAnalyzerLspPath);
@@ -231,13 +242,13 @@ async function maybeDownloadLspServer(): Promise<void> {
       return;
     }
     log.info('before copy file');
-    fs.copyFileSync(userConfiguredAnalyzerLspPath, lspPath);
-    analyzerLspPath = lspPath;
+    fs.copyFileSync(userConfiguredAnalyzerLspPath, dest_server_path);
+    analyzerLspPath = dest_server_path;
   } else {
     log.info('before ensureServerDownloaded');
     analyzerLspPath = await ensureServerDownloaded();
     if (analyzerLspPath !== undefined) {
-      fs.copyFileSync(analyzerLspPath, lspPath);
+      fs.copyFileSync(analyzerLspPath, dest_server_path);
     }
     log.info('analyzerLspPath = ' + analyzerLspPath);
   }

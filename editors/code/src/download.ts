@@ -1,7 +1,7 @@
 import { getLspReleaseAssetName, writeLspMetadata } from "./util";
 import * as path from "path";
 import * as fs from "fs";
-import { downloadFromUrl } from "./utils/download";
+import { downloadFromUrl_v2 } from "./utils/download";
 import { log } from "./log";
 
 export async function downloadLsp(
@@ -17,18 +17,13 @@ export async function downloadLsp(
   const savePath = path.join(extensionPath, assetName);
   log.info('savePath = ' + savePath);
   try {
-    await downloadFromUrl(
+    await downloadFromUrl_v2(
       url,
       savePath,
       6000,
+      "https://127.0.0.1:7890",
+      10
     );
-    // await downloadFromUrl_v2(
-    //   url,
-    //   savePath,
-    //   6000,
-    //   "https://127.0.0.1:7890",
-    //   10
-    // );
 
     log.info('after downloadFromUrl');
     fs.chmodSync(savePath, 0o775);

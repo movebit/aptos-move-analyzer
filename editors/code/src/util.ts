@@ -7,7 +7,7 @@ import { log } from "./log";
 const artifactNameTemplates: any = {
   darwin: "aptos-move-analyzer-mac-x86_64-__VERSION__",
   linux: "aptos-move-analyzer-ubuntu20.04-x86_64-__VERSION__",
-  win32: "aptos-move-analyzer-windows-x86_64-__VERSION__",
+  win32: "aptos-move-analyzer-windows-x86_64-__VERSION__.exe",
 };
 
 const versionFileName = "lsp-metadata.json";
