@@ -29,14 +29,17 @@ class FmtConfig {
     }
 }
 
+function isValidUrl(url: string): boolean {
+    const regex = /^(https?:\/\/)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+    return regex.test(url);
+}
+
 /**
  * User-defined configuration values, such as those specified in VS Code settings.
  *
  * This provides a more strongly typed interface to the configuration values specified in this
  * extension's `package.json`, under the key `"contributes.configuration.properties"`.
  */
-
-
 class Configuration {
     private readonly configuration: vscode.WorkspaceConfiguration;
 
@@ -88,6 +91,16 @@ class Configuration {
         const max_width = this.configuration.get<number>('movefmt.max_width')!;
         const indent_size = this.configuration.get<number>('movefmt.indent_size')!;
         return new FmtConfig(enable, max_width, indent_size);
+    }
+
+    get proxyAddr(): string {
+        const defaultAddr = 'https://127.0.0.1:7890';
+        log.info('isValidUrl(defaultAddr) = ' + isValidUrl(defaultAddr));
+        let proxy_addr = this.configuration.get<string>('proxy.addr', defaultAddr);
+        if (proxy_addr !== undefined && isValidUrl(proxy_addr)) {
+            return proxy_addr;
+        }
+        return defaultAddr;
     }
 }
 

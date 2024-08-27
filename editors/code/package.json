@@ -140,6 +140,11 @@
 					],
 					"default": "off",
 					"description": "Traces the communication between the aptos-move-analyzer language server and Visual Studio Code. Note that this log can be very verbose, and so not recommended for anyone besides people working on or debugging aptos-move-analyzer itself."
+				},
+				"aptos-move-analyzer.proxy.addr": {
+					"type": "string",
+					"default": "https://127.0.0.1:7890",
+					"markdownDescription": "Maybe you need vpn proxy to access github release page"
 				}
 			}
 		},

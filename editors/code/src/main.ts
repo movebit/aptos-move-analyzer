@@ -202,9 +202,11 @@ async function ensureServerDownloaded(): Promise<string | undefined> {
   log.info('Install the LSP and update the version metadata file');
   // Install the LSP and update the version metadata file
   updateStatus("downloading", versionToDownload);
+  const configuration = new Configuration();
   const newLspPath = await downloadLsp(
     os.homedir() + "/.cargo/bin/",
     versionToDownload,
+    configuration.proxyAddr
   );
   if (newLspPath === undefined) {
     updateStatus("error");
