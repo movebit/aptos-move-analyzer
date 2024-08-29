@@ -1,10 +1,7 @@
 // Copyright (c) The BitsLab.MoveBit Contributors
 // SPDX-License-Identifier: Apache-2.0
+use crate::{context::*, utils::path_concat};
 use lsp_server::{Request, *};
-use crate::{
-    context::*,
-    utils::path_concat,
-};
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
 use move_compiler::parser::{

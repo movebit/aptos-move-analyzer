@@ -31,7 +31,7 @@ pub fn on_generate_spec_sel(context: &mut Context, request: &Request) -> Respons
                 result: Some(serde_json::json!({"msg": "not a valid path"})),
                 error: None,
             };
-        },
+        }
     };
 
     let project = match context.projects.get_project(&parameters.fpath) {
@@ -43,7 +43,7 @@ pub fn on_generate_spec_sel(context: &mut Context, request: &Request) -> Respons
                 result: Some(serde_json::json!({"msg": "No available project"})),
                 error: None,
             };
-        },
+        }
     };
 
     let mut insert_pos: (u32, u32) = (0, 0);

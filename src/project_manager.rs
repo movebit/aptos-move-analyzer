@@ -215,7 +215,7 @@ impl Project {
             None => {
                 log::error!("not move project.");
                 return;
-            },
+            }
         };
 
         let new_project = match Project::new(root_dir.clone(), |msg| log::info!("{}", msg)) {
@@ -223,7 +223,7 @@ impl Project {
             Err(_) => {
                 log::error!("reload project failed");
                 return;
-            },
+            }
         };
 
         self.current_modifing_file_content = content;
@@ -302,7 +302,7 @@ impl Project {
                 log::error!("parse_move_manifest_from_file failed,err:{:?}", err);
                 self.manifest_load_failures.insert(manifest_path.clone());
                 return anyhow::Result::Ok(());
-            },
+            }
         };
         self.manifests.push(manifest.clone());
         // load depends.

@@ -32,7 +32,7 @@ pub fn on_inlay_hints(
                 result: Some(serde_json::json!({"msg": "No available project"})),
                 error: None,
             };
-        },
+        }
     }
     .run_visitor_for_file(&mut handler, &fpath, String::default());
 
@@ -197,7 +197,7 @@ impl Handler {
             Call(..) => {
                 self.process_call(env, e);
                 true
-            },
+            }
             LocalVar(node_id, localvar_symbol) => {
                 let mut localvar_loc = env.get_node_loc(*node_id);
                 localvar_loc = move_model::model::Loc::new(
@@ -265,13 +265,13 @@ impl Handler {
                                         inlay_hint_pos
                                     );
                                     self.process_type(env, &inlay_hint_pos, &node_type);
-                                },
+                                }
                             }
                         }
                     }
                 }
                 true
-            },
+            }
             Temporary(node_id, idx) => {
                 let mut tmpvar_loc = env.get_node_loc(*node_id);
                 tmpvar_loc = move_model::model::Loc::new(
@@ -305,13 +305,13 @@ impl Handler {
                                 Some(':') => return true,
                                 _ => {
                                     self.process_type(env, &inlay_hint_pos, &node_type);
-                                },
+                                }
                             }
                         }
                     }
                 }
                 true
-            },
+            }
             Block(_, pattern, _, _) => {
                 for (sym_node_id, sym_symbol) in pattern.vars() {
                     let mut sym_loc = env.get_node_loc(sym_node_id);
@@ -357,14 +357,14 @@ impl Handler {
                                             inlay_hint_pos
                                         );
                                         self.process_type(env, &inlay_hint_pos, &node_type);
-                                    },
+                                    }
                                 }
                             }
                         }
                     }
                 }
                 true
-            },
+            }
             _ => true,
         });
     }
@@ -425,11 +425,11 @@ impl Handler {
         match unpack_ty {
             move_model::ty::Type::Reference(_, _) => {
                 unpack_ty = ty.skip_reference().clone();
-            },
+            }
             move_model::ty::Type::Vector(_) => {
                 unpack_ty = ty.get_vector_element_type().unwrap();
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         if let move_model::ty::Type::Struct(mid, sid, _) = unpack_ty {

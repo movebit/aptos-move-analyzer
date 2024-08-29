@@ -190,31 +190,31 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
     match request.method.as_str() {
         lsp_types::request::GotoDefinition::METHOD => {
             goto_definition::on_go_to_def_request(context, request);
-        },
+        }
         lsp_types::request::References::METHOD => {
             references::on_references_request(context, request);
-        },
+        }
         lsp_types::request::HoverRequest::METHOD => {
             hover::on_hover_request(context, request);
-        },
+        }
         lsp_types::request::Completion::METHOD => {
             completion::on_completion_request(context, request);
-        },
+        }
         lsp_types::request::InlayHintRequest::METHOD => {
             inlay_hints::on_inlay_hints(context, request, &analyzer_cfg.inlay_hints_config);
-        },
+        }
         lsp_types::request::DocumentSymbolRequest::METHOD => {
             symbols::on_document_symbol_request(context, request);
-        },
+        }
         lsp_types::request::Formatting::METHOD => {
             on_movefmt_request(context, request, &analyzer_cfg.movefmt_config);
-        },
+        }
         "move/generate/spec/file" => {
             on_generate_spec_file(context, request, true);
-        },
+        }
         "move/generate/spec/sel" => {
             on_generate_spec_sel(context, request);
-        },
+        }
         "move/lsp/client/inlay_hints/config" => {
             let parameters = serde_json::from_value::<InlayHintsConfig>(request.params.clone())
                 .expect("could not deserialize inlay hints config");
@@ -269,7 +269,7 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
                     }))
                     .unwrap();
             }
-        },
+        }
         "move/lsp/movefmt/config" => {
             let parameters = serde_json::from_value::<FmtConfig>(request.params.clone())
                 .expect("could not deserialize movefmt config");
@@ -315,10 +315,10 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
                     }))
                     .unwrap();
             }
-        },
+        }
         _ => {
             log::error!("unsupported request: '{}' from client", request.method)
-        },
+        }
     }
 }
 
@@ -334,7 +334,7 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
         None => {
             log::error!("project not found:{:?}", fpath.as_path());
             return;
-        },
+        }
     };
     log::info!("report_diag -------------");
 
@@ -440,11 +440,11 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
                 Err(err) => {
                     log::error!("read file failed,err:{:?}", err);
                     return;
-                },
+                }
             };
             update_defs_on_changed(context, fpath.clone(), content);
             make_diag(context, diag_sender, fpath);
-        },
+        }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
             use lsp_types::DidChangeTextDocumentParams;
             let parameters =
@@ -457,7 +457,7 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
                 fpath,
                 parameters.content_changes.last().unwrap().text.clone(),
             );
-        },
+        }
 
         lsp_types::notification::DidOpenTextDocument::METHOD => {
             use lsp_types::DidOpenTextDocumentParams;
@@ -472,7 +472,7 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
                     log::error!("not move project.");
                     send_not_project_file_error(context, fpath, true);
                     return;
-                },
+                }
             };
             match context.projects.get_project(&fpath) {
                 Some(_) => {
@@ -480,23 +480,23 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
                         // update_defs_on_changed(context, fpath.clone(), x);
                     };
                     return;
-                },
+                }
                 None => {
                     log::error!("project '{:?}' not found try load.", fpath.as_path());
-                },
+                }
             };
             let p = match context.projects.load_projects(&context.connection, &mani) {
                 anyhow::Result::Ok(x) => x,
                 anyhow::Result::Err(e) => {
                     log::error!("load project failed,err:{:?}", e);
                     return;
-                },
+                }
             };
 
             context.projects.insert_project(p);
             make_diag(context, diag_sender, fpath.clone());
             report_diag(context, fpath);
-        },
+        }
         lsp_types::notification::DidCloseTextDocument::METHOD => {
             use lsp_types::DidCloseTextDocumentParams;
             let parameters =
@@ -510,11 +510,11 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
                     log::error!("not move project.");
                     send_not_project_file_error(context, fpath, false);
                     return;
-                },
+                }
             };
-        },
+        }
 
-        _ => {},
+        _ => {}
     }
 }
 
@@ -540,11 +540,11 @@ fn get_package_compile_diagnostics(pkg_path: &Path) -> Result<Diagnostics> {
         |compiler| {
             let (_, compilation_result) = compiler.run::<PASS_TYPING>()?;
             match compilation_result {
-                std::result::Result::Ok(_) => {},
+                std::result::Result::Ok(_) => {}
                 std::result::Result::Err(diags) => {
                     log::error!("PASS_TYPING get diags");
                     diagnostics = Some(diags);
-                },
+                }
             };
             Ok(Default::default())
         },
@@ -562,14 +562,14 @@ fn make_diag(context: &Context, diag_sender: DiagSender, fpath: PathBuf) {
         None => {
             log::error!("manifest not found.");
             return;
-        },
+        }
     };
     match context.projects.get_project(&fpath) {
         Some(x) => {
             if !x.load_ok() {
                 return;
             }
-        },
+        }
         None => return,
     };
     std::thread::spawn(move || {
@@ -578,7 +578,7 @@ fn make_diag(context: &Context, diag_sender: DiagSender, fpath: PathBuf) {
             Err(err) => {
                 log::error!("get_package_compile_diagnostics failed,err:{:?}", err);
                 return;
-            },
+            }
         };
         diag_sender.lock().unwrap().send((mani, x)).unwrap();
     });
@@ -634,19 +634,19 @@ fn send_diag(context: &mut Context, mani: PathBuf, x: Diagnostics) {
                 severity: Some(match s {
                     codespan_reporting::diagnostic::Severity::Bug => {
                         lsp_types::DiagnosticSeverity::ERROR
-                    },
+                    }
                     codespan_reporting::diagnostic::Severity::Error => {
                         lsp_types::DiagnosticSeverity::ERROR
-                    },
+                    }
                     codespan_reporting::diagnostic::Severity::Warning => {
                         lsp_types::DiagnosticSeverity::WARNING
-                    },
+                    }
                     codespan_reporting::diagnostic::Severity::Note => {
                         lsp_types::DiagnosticSeverity::INFORMATION
-                    },
+                    }
                     codespan_reporting::diagnostic::Severity::Help => {
                         lsp_types::DiagnosticSeverity::HINT
-                    },
+                    }
                 }),
                 message: format!(
                     "{}\n{}{:?}",

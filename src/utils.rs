@@ -218,10 +218,10 @@ pub fn normal_path_components(x: &Vec<Component<'_>>) -> PathBuf {
         match v {
             Component::Prefix(x) => ret.push(x.as_os_str()),
             Component::RootDir => ret.push("/"),
-            Component::CurDir => {},
+            Component::CurDir => {}
             Component::ParentDir => {
                 let _ = ret.pop();
-            },
+            }
             Component::Normal(x) => ret.push(*x),
         }
     }
@@ -485,7 +485,7 @@ pub fn collect_use_decl(
             None => {
                 log::error!("use decl module name not found in project");
                 continue;
-            },
+            }
         };
 
         let addr_addrnum_with_module_name =

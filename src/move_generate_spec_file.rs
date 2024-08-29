@@ -54,7 +54,7 @@ where
                 result: Some(serde_json::json!({"msg": "project not found."})),
                 error: None,
             };
-        },
+        }
     };
     let env = &project.global_env;
 
@@ -74,8 +74,8 @@ where
                     eprintln!("{:?} : {}", k.clone(), addr_symbol.value.to_string());
                     addr_num_and_module_name_to_addr_name.insert(k, addr_symbol.value.to_string());
                 }
-            },
-            Address::NamedUnassigned(_) => {},
+            }
+            Address::NamedUnassigned(_) => {}
         });
 
     for module_env in get_modules_by_fpath_in_target_modules(&project.global_env, &fpath) {
@@ -157,7 +157,7 @@ where
     let file_content = result.get_result_string();
     if is_generate {
         match std::fs::write(result_file_path.clone(), file_content.clone()) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(err) => {
                 send_err(context, format!("write to file failed,err:{:?}", err));
                 return lsp_server::Response {
@@ -165,7 +165,7 @@ where
                     result: Some(serde_json::json!({"msg": "write to file failed"})),
                     error: None,
                 };
-            },
+            }
         };
     }
 

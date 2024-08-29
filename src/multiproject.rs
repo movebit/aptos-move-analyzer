@@ -56,10 +56,10 @@ impl MultiProject {
             match child.wait_timeout(Duration::new(30, 0)) {
                 Ok(_) => {
                     fetch_ok = true;
-                },
+                }
                 Err(err) => {
                     log::error!("exec cmd fetch deps failed,err:{:?}", err);
-                },
+                }
             }
             let _ = child.kill();
             if !fetch_ok {
@@ -121,11 +121,11 @@ impl MultiProject {
 
     pub fn update_defs(&mut self, file_path: PathBuf, content: String) {
         match super::utils::discover_manifest_and_kind(file_path.as_path()) {
-            Some(_) => {},
+            Some(_) => {}
             None => {
                 log::error!("file_path {:?} not found", file_path.as_path());
                 return;
-            },
+            }
         };
 
         self.get_projects_mut(&file_path)
@@ -178,7 +178,7 @@ impl MultiProject {
                 Err(_) => {
                     log::error!("reload project failed");
                     return;
-                },
+                }
             };
             all.push((k, x));
         }
@@ -199,7 +199,7 @@ impl MultiProject {
                         format!("reload project failed,err:{:?}", err),
                     );
                     continue;
-                },
+                }
             };
             all.push((k, x));
         }

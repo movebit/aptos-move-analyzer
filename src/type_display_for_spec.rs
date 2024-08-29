@@ -53,10 +53,10 @@ impl<'a> fmt::Display for TypeDisplayForSpec<'a> {
                 f.write_str("(")?;
                 comma_list(f, ts)?;
                 f.write_str(")")
-            },
+            }
             Vector(t) => {
                 write!(f, "vector<{}>", self.make(t))
-            },
+            }
             TypeDomain(t) => write!(f, "domain<{}>", self.make(t)),
             ResourceDomain(mid, sid, inst_opt) => {
                 write!(f, "resources<{}", self.struct_str(*mid, *sid))?;
@@ -66,13 +66,13 @@ impl<'a> fmt::Display for TypeDisplayForSpec<'a> {
                     f.write_str(">")?;
                 }
                 f.write_str(">")
-            },
+            }
             Fun(a, t) => {
                 f.write_str("|")?;
                 write!(f, "{}", self.make(a))?;
                 f.write_str("|")?;
                 write!(f, "{}", self.make(t))
-            },
+            }
             Struct(mid, sid, ts) => {
                 write!(f, "{}", self.struct_str(*mid, *sid))?;
                 if !ts.is_empty() {
@@ -81,7 +81,7 @@ impl<'a> fmt::Display for TypeDisplayForSpec<'a> {
                     f.write_str(">")?;
                 }
                 Ok(())
-            },
+            }
             Reference(kind, t) => {
                 f.write_str("&")?;
                 let modifier = match kind {
@@ -90,7 +90,7 @@ impl<'a> fmt::Display for TypeDisplayForSpec<'a> {
                 };
                 f.write_str(modifier)?;
                 write!(f, "{}", self.make(t))
-            },
+            }
             TypeParameter(idx) => {
                 if let Some(names) = &self.context.type_param_names {
                     let idx = *idx as usize;
@@ -102,10 +102,10 @@ impl<'a> fmt::Display for TypeDisplayForSpec<'a> {
                 } else {
                     write!(f, "#{}", idx)
                 }
-            },
+            }
             Var(_) => {
                 write!(f, "")
-            },
+            }
             Error => f.write_str("*error*"),
         }
     }

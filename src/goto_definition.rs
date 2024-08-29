@@ -10,7 +10,8 @@ use codespan::Span;
 use lsp_server::*;
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
-use move_compiler::parser::lexer::{Lexer, Tok};
+use move_compiler::parser::lexer::{self, Lexer, Tok};
+use move_ir_types::location::ByteIndex;
 use move_model::{
     ast::{ExpData::*, Operation::*, Pattern as MoveModelPattern, Spec, SpecBlockTarget},
     model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, ModuleId, NodeId, StructId},
@@ -484,15 +485,44 @@ impl Handler {
         let specifier_vec = target_fun.get_access_specifiers();
         let require_vec = target_fun.get_acquires_global_resources();
 
-        let fn_source = env.get_source(&target_fun.get_loc());
+        let mut para_list_end_pos = target_fun.get_id_loc();
+        if let Some(last_para) = &target_fun.get_parameters().last() {
+            para_list_end_pos = last_para.2.clone();
+        }
+
+        let mut capture_ty_loc = para_list_end_pos.clone();
+        if let Some(exp) = target_fun.get_def().as_deref() {
+            let exp_loc = env.get_node_loc(exp.node_id());
+            // let exp_loc_src = env.get_source(&exp_loc);
+            // log::info!("exp_loc_src = {:?}", exp_loc_src);
+            capture_ty_loc = move_model::model::Loc::new(
+                target_fun.get_loc().file_id(),
+                codespan::Span::new(para_list_end_pos.span().end(), exp_loc.span().start()),
+            );
+        }
+
+        let capture_ty_src = env.get_source(&capture_ty_loc);
+        log::info!("capture_ty_src 11 = {:?}", capture_ty_src);
+
+        let fn_source = env.get_source(&capture_ty_loc);
         if let Ok(fn_str) = fn_source {
             let mut r_paren_vec = vec![];
             let mut l_brace_vec = vec![];
             let mut lexer = Lexer::new(fn_str, FileHash::new(fn_str));
             let mut capture_ty_start_pos = 0;
             let mut capture_ty_end_pos = 0;
+            let lexer_start_pos = capture_ty_loc.span().start();
             if !lexer.advance().is_err() {
                 while lexer.peek() != Tok::EOF {
+                    let token_start_pos = lexer.start_loc() + usize::from(lexer_start_pos);
+                    if token_start_pos <= self.mouse_span.end().into()
+                        && usize::from(self.mouse_span.end())
+                            <= token_start_pos + lexer.content().len()
+                    {
+                        capture_ty_start_pos = lexer.start_loc();
+                        capture_ty_end_pos = capture_ty_start_pos + lexer.content().len();
+                        break;
+                    }
                     if lexer.peek() == Tok::Colon {
                         if !r_paren_vec.is_empty() {
                             capture_ty_start_pos = lexer.start_loc();
@@ -513,15 +543,21 @@ impl Handler {
                     }
                 }
             }
-            let capture_ty_loc = move_model::model::Loc::new(
-                target_fun.get_loc().file_id(),
+            log::info!(
+                "capture_ty_start_pos= {:?}, capture_ty_end_pos = {:?}",
+                capture_ty_start_pos,
+                capture_ty_end_pos
+            );
+            capture_ty_loc = move_model::model::Loc::new(
+                capture_ty_loc.file_id(),
                 codespan::Span::new(
-                    target_fun.get_loc().span().start()
+                    capture_ty_loc.span().start()
                         + codespan::ByteOffset(capture_ty_start_pos as i64),
-                    target_fun.get_loc().span().start()
-                        + codespan::ByteOffset(capture_ty_end_pos as i64),
+                    capture_ty_loc.span().start() + codespan::ByteOffset(capture_ty_end_pos as i64),
                 ),
             );
+
+            log::info!("capture_ty_src 22 = {:?}", env.get_source(&capture_ty_loc));
             self.process_type(env, &capture_ty_loc, &ret_ty_vec);
 
             if let Some(specifiers) = specifier_vec {
@@ -1104,51 +1140,56 @@ impl Handler {
                     "process_type -->> type_struct = {:?}",
                     type_struct.get_full_name_str()
                 );
-                log::info!(
-                    "process_type -->> env.get_source(capture_items_loc) = {:?}",
-                    env.get_source(capture_items_loc)
-                );
-                self.insert_result(env, &type_struct.get_loc(), capture_items_loc);
+
+                let mut capture_generic_ty_src = "".to_string();
+                let capture_generic_ty_source = env.get_source(capture_items_loc);
+                if let Ok(capture_generic_ty_str) = capture_generic_ty_source {
+                    capture_generic_ty_src = capture_generic_ty_str.to_string();
+                }
+                if type_struct
+                    .get_full_name_str()
+                    .contains(&capture_generic_ty_src)
+                {
+                    self.insert_result(env, &type_struct.get_loc(), capture_items_loc);
+                }
 
                 for ty in ty_vec {
                     if let Some(generic_struct_ty) = ty.get_struct(env) {
                         let generic_struct_ty_symbol = generic_struct_ty.0.get_name();
                         let capture_generic_ty_source = env.get_source(capture_items_loc);
-                        if let Ok(capture_generic_ty_str) = capture_generic_ty_source {
-                            let generic_struct_ty_symbol_display =
-                                generic_struct_ty_symbol.display(env.symbol_pool());
-                            log::info!(
-                                "generic_struct_ty_symbol_display = {:?}",
-                                generic_struct_ty_symbol_display.to_string()
+                        let generic_struct_ty_symbol_display =
+                            generic_struct_ty_symbol.display(env.symbol_pool());
+                        log::info!(
+                            "generic_struct_ty_symbol_display = {:?}",
+                            generic_struct_ty_symbol_display.to_string()
+                        );
+                        if let Some(index) = capture_generic_ty_src
+                            .find(generic_struct_ty_symbol_display.to_string().as_str())
+                        {
+                            let capture_generic_ty_str_len =
+                                generic_struct_ty_symbol_display.to_string().len();
+                            let capture_generic_ty_start = (*capture_items_loc).span().start()
+                                + codespan::ByteOffset(index.try_into().unwrap());
+                            let capture_generic_ty_end = capture_generic_ty_start
+                                + codespan::ByteOffset(
+                                    capture_generic_ty_str_len.try_into().unwrap(),
+                                );
+                            let capture_generic_ty_loc = move_model::model::Loc::new(
+                                (*capture_items_loc).file_id(),
+                                codespan::Span::new(
+                                    capture_generic_ty_start,
+                                    capture_generic_ty_end,
+                                ),
                             );
-                            if let Some(index) = capture_generic_ty_str
-                                .find(generic_struct_ty_symbol_display.to_string().as_str())
-                            {
-                                let capture_generic_ty_str_len =
-                                    generic_struct_ty_symbol_display.to_string().len();
-                                let capture_generic_ty_start = (*capture_items_loc).span().start()
-                                    + codespan::ByteOffset(index.try_into().unwrap());
-                                let capture_generic_ty_end = capture_generic_ty_start
-                                    + codespan::ByteOffset(
-                                        capture_generic_ty_str_len.try_into().unwrap(),
-                                    );
-                                let capture_generic_ty_loc = move_model::model::Loc::new(
-                                    (*capture_items_loc).file_id(),
-                                    codespan::Span::new(
-                                        capture_generic_ty_start,
-                                        capture_generic_ty_end,
-                                    ),
-                                );
-                                log::trace!(
-                                    "capture_generic_ty_str = {:?}",
-                                    env.get_source(&capture_generic_ty_loc)
-                                );
-                                self.insert_result(
-                                    env,
-                                    &generic_struct_ty.0.get_loc(),
-                                    &capture_generic_ty_loc,
-                                );
-                            }
+                            log::trace!(
+                                "capture_generic_ty_str = {:?}",
+                                env.get_source(&capture_generic_ty_loc)
+                            );
+                            self.insert_result(
+                                env,
+                                &generic_struct_ty.0.get_loc(),
+                                &capture_generic_ty_loc,
+                            );
                         }
                     }
                 }

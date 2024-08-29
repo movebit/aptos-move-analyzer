@@ -87,7 +87,7 @@ pub fn on_document_symbol_request(context: &Context, request: &Request) -> lsp_s
                 result: Some(serde_json::json!({"msg": "coule not found project from file path"})),
                 error: None,
             };
-        },
+        }
     };
 
     let module_envs = match may_target_modules {
@@ -102,7 +102,7 @@ pub fn on_document_symbol_request(context: &Context, request: &Request) -> lsp_s
                 result: Some(serde_json::json!({"msg": "coule not found module from file path"})),
                 error: None,
             };
-        },
+        }
     };
 
     let mut result_vec_document_symbols: Vec<DocumentSymbol> = vec![];
@@ -171,21 +171,21 @@ fn handle_document_symbols_spec_function(
 ) {
     for spec_info in module_env.get_spec_block_infos() {
         match project.global_env.get_file_and_location(&spec_info.loc) {
-            Some((_, _)) => {},
+            Some((_, _)) => {}
             None => {
                 log::error!(
                     "could not get file and location from spec info, spec: {:?}",
                     spec_info
                 );
                 continue;
-            },
+            }
         };
 
         let (spec_name, spec_range) = match spec_info.target {
             SpecBlockTarget::Function(_, fid) => {
                 let f_env = module_env.get_function(fid);
                 (f_env.get_name_str(), project.loc_to_range(&spec_info.loc))
-            },
+            }
             SpecBlockTarget::Struct(_, sid) => {
                 let s_env = module_env.get_struct(sid);
                 (
@@ -195,7 +195,7 @@ fn handle_document_symbols_spec_function(
                         .to_string(),
                     project.loc_to_range(&spec_info.loc),
                 )
-            },
+            }
             _ => continue,
         };
 

@@ -22,7 +22,7 @@ mod tests {
             None => {
                 log::error!("not move project.");
                 return;
-            },
+            }
         };
         match context.projects.get_project(&fpath) {
             Some(_) => {
@@ -30,17 +30,17 @@ mod tests {
                     // update_defs_on_changed(context, fpath.clone(), x);
                 };
                 return;
-            },
+            }
             None => {
                 eprintln!("project '{:?}' not found try load.", fpath.as_path());
-            },
+            }
         };
         let p = match context.projects.load_projects(&context.connection, &mani) {
             anyhow::Result::Ok(x) => x,
             anyhow::Result::Err(e) => {
                 log::error!("load project failed,err:{:?}", e);
                 return;
-            },
+            }
         };
         context.projects.insert_project(p);
     }
@@ -67,7 +67,7 @@ mod tests {
             None => {
                 log::error!("project '{:?}' not found.", fpath.as_path());
                 return;
-            },
+            }
         };
 
         let params_json = json!({
@@ -134,7 +134,7 @@ mod tests {
             None => {
                 log::error!("project '{:?}' not found.", fpath.as_path());
                 return;
-            },
+            }
         };
 
         let params_json = json!({
@@ -199,7 +199,7 @@ mod tests {
             None => {
                 log::error!("project '{:?}' not found.", fpath.as_path());
                 return;
-            },
+            }
         };
 
         let params_json = json!({
@@ -264,7 +264,7 @@ mod tests {
             None => {
                 log::error!("project '{:?}' not found.", fpath.as_path());
                 return;
-            },
+            }
         };
 
         let params_json = json!({
@@ -329,7 +329,7 @@ mod tests {
             None => {
                 log::error!("project '{:?}' not found.", fpath.as_path());
                 return;
-            },
+            }
         };
 
         let params_json = json!({
@@ -399,7 +399,7 @@ mod tests {
             None => {
                 log::error!("project '{:?}' not found.", fpath.as_path());
                 return;
-            },
+            }
         };
 
         let params_json = json!({

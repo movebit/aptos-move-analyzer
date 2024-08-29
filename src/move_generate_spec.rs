@@ -221,13 +221,13 @@ impl FunSpecGenerator {
                                 over_type
                             );
                             statements.push_str(statements_abort_if.as_str());
-                        },
+                        }
                         BinOPReason::DivByZero => {
                             statements.push_str(
                                 format!("{}aborts_if {} == 0;\n", indent(2), _right_exp_str,)
                                     .as_str(),
                             );
-                        },
+                        }
                         BinOPReason::UnderFlow => {
                             statements.push_str(
                                 format!(
@@ -238,9 +238,9 @@ impl FunSpecGenerator {
                                 )
                                 .as_str(),
                             );
-                        },
+                        }
                     };
-                },
+                }
                 SpecExpItem::MarcoAbort { if_exp, abort_exp } => {
                     if let MoveModelExpData::Call(_, op, _) = if_exp.as_ref() {
                         match op {
@@ -253,16 +253,16 @@ impl FunSpecGenerator {
                                 FunSpecGenerator::handle_binop_exp(
                                     statements, if_exp, op, abort_exp, env,
                                 );
-                            },
+                            }
                             MoveModelOperation::MoveFunction(_, _) => {
                                 FunSpecGenerator::handle_funcop_exp(
                                     statements, if_exp, abort_exp, env,
                                 );
-                            },
-                            _ => {},
+                            }
+                            _ => {}
                         }
                     }
-                },
+                }
                 SpecExpItem::PatternLet { left, right } => {
                     let _left_node_id = left.node_id();
                     let _left_node_loc = env.get_node_loc(_left_node_id);
@@ -283,10 +283,10 @@ impl FunSpecGenerator {
                     };
                     statements.push_str(_right_exp_str);
                     statements.push_str(";\n");
-                },
-                SpecExpItem::BorrowGlobalMut { .. } => {},
-                SpecExpItem::TypeName { .. } => {},
-                SpecExpItem::TypeOf { .. } => {},
+                }
+                SpecExpItem::BorrowGlobalMut { .. } => {}
+                SpecExpItem::TypeName { .. } => {}
+                SpecExpItem::TypeOf { .. } => {}
             }
         }
     }

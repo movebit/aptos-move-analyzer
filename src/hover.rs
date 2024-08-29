@@ -38,7 +38,7 @@ pub fn on_hover_request(context: &Context, request: &Request) -> lsp_server::Res
                 result: Some(serde_json::json!({"msg": "No available project"})),
                 error: None,
             };
-        },
+        }
     }
     .run_visitor_for_file(&mut handler, &fpath, String::default());
 
@@ -516,11 +516,11 @@ impl Handler {
                         }
                     }
                     true
-                },
+                }
                 Call(..) => {
                     self.process_call(env, e);
                     true
-                },
+                }
                 LocalVar(node_id, localvar_symbol) => {
                     let localvar_loc = env.get_node_loc(*node_id);
 
@@ -549,7 +549,7 @@ impl Handler {
                         self.process_type(env, &localvar_loc, &node_type);
                     }
                     true
-                },
+                }
                 Temporary(node_id, _) => {
                     let tmpvar_loc = env.get_node_loc(*node_id);
                     if tmpvar_loc.span().start() > self.mouse_span.end()
@@ -562,15 +562,15 @@ impl Handler {
                         self.process_type(env, &tmpvar_loc, &node_type);
                     }
                     true
-                },
+                }
                 Block(_, pattern, _, _) => {
                     self.match_pattern(env, pattern);
                     true
-                },
+                }
                 Assign(_, pattern, _) => {
                     self.match_pattern(env, pattern);
                     true
-                },
+                }
                 _ => true,
             }
         });
@@ -592,7 +592,7 @@ impl Handler {
                 }
                 // handle struct field
                 self.process_struct_field(env, &this_loc, &q_sid.module_id, &q_sid.id);
-            },
+            }
             Pattern::Tuple(nid, vec_p) => {
                 let this_loc = env.get_node_loc(*nid);
                 if this_loc.span().start() > self.mouse_span.end()
@@ -604,7 +604,7 @@ impl Handler {
                 for p in vec_p.iter() {
                     self.match_pattern(env, p);
                 }
-            },
+            }
             Pattern::Var(nid, _) => {
                 let this_loc = env.get_node_loc(*nid);
                 if this_loc.span().start() > self.mouse_span.end()
@@ -616,8 +616,8 @@ impl Handler {
                 if let Some(node_type) = env.get_node_type_opt(*nid) {
                     self.process_type(env, &this_loc, &node_type);
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 
