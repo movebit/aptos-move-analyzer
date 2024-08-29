@@ -93,7 +93,7 @@
 			"properties": {
 				"aptos-move-analyzer.server.path": {
 					"type": "string",
-					"default": "aptos-move-analyzer",
+					"default": "~/.cargo/bin/aptos-move-analyzer",
 					"markdownDescription": "Path and filename of the aptos-move-analyzer executable, e.g. `/usr/bin/aptos-move-analyzer`."
 				},
 				"aptos-move-analyzer.inlay.hints.enable": {
@@ -201,7 +201,12 @@
 		"d3": "^7.8.5",
 		"d3-graphviz": "^5.0.2",
 		"lru-cache": "^4.1.3",
-		"vscode-languageclient": "9.0.2-next.1"
+		"vscode-languageclient": "9.0.2-next.1",
+		"follow-redirects": "^1.15.6",
+		"vscode-test": "^1.6.1",
+		"copyfiles": "2.4.1",
+		"cross-env": "^7.0.3",
+		"https-proxy-agent": "^7.0.0"
 	},
 	"devDependencies": {
 		"@tsconfig/strictest": "^2.0.1",
@@ -215,18 +220,14 @@
 		"@typescript-eslint/parser": "^6.0.0",
 		"@vscode/test-electron": "^2.3.3",
 		"@vscode/vsce": "^2.19.0",
-		"copyfiles": "2.4.1",
-		"cross-env": "^7.0.3",
 		"esbuild": "^0.18.12",
 		"eslint": "^7.32.0",
 		"eslint-plugin-tsdoc": "^0.2.14",
-		"follow-redirects": "^1.15.6",
 		"fs-extra": "10.0.1",
 		"mocha": "^9.1.1",
 		"typescript": "^5.1.6",
 		"typescript-formatter": "^7.2.2",
-		"vsce": "^1.97.0",
-		"vscode-test": "^1.6.1"
+		"vsce": "^1.97.0"
 	},
 	"__metadata": {
 		"id": "71e74fc8-23c2-47b7-8594-ed00192d96a6",

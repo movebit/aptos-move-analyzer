@@ -43,16 +43,16 @@ export async function downloadLsp(
     await downloadFromUrl_v2(
       url,
       savePath,
-      6000,
+      9000,
       b_need_proxy ?  proxy : undefined,
-      10
+      3
     );
 
     log.info('after downloadFromUrl');
     fs.chmodSync(savePath, 0o775);
     writeLspMetadata(extensionPath, version);
   } catch (e: any) {
-    log.info("catch Error downloading aptos-move-analyzer" + e);
+    log.info("catch Error downloading aptos-move-analyzer " + e);
     // TODO - backup existing and return that path
     return;
   }

@@ -54,7 +54,7 @@ class Configuration {
 
     /** The path to the aptos-move-analyzer executable. */
     get serverPath(): string {
-        const defaultName = 'aptos-move-analyzer';
+        const defaultName = os.homedir() + '/.cargo/bin/aptos-move-analyzer';
         let serverPath = this.configuration.get<string>('server.path', defaultName);
         if (serverPath.length === 0) {
             // The default value of the `server.path` setting is 'aptos-move-analyzer'.

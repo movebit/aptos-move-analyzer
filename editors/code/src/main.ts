@@ -229,7 +229,7 @@ async function maybeDownloadLspServer(): Promise<void> {
   const userConfiguredAnalyzerLspPath = configuration.serverPath;
   log.info('userConfiguredAnalyzerLspPath = ' + userConfiguredAnalyzerLspPath);
   if (
-    userConfiguredAnalyzerLspPath !== "aptos-move-analyzer"
+    userConfiguredAnalyzerLspPath !== dest_server_path
   ) {
     // Check that the LSP is statically linked, we can assume
     // this from the file size (if it's less than 1mb, conservatively it ain't statically linked)
@@ -252,6 +252,7 @@ async function maybeDownloadLspServer(): Promise<void> {
     if (analyzerLspPath !== undefined) {
       fs.copyFileSync(analyzerLspPath, dest_server_path);
     }
+    analyzerLspPath = dest_server_path;
     log.info('analyzerLspPath = ' + analyzerLspPath);
   }
 }
