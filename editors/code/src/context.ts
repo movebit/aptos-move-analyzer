@@ -4,7 +4,6 @@
 
 import type { Configuration } from './configuration';
 import * as vscode from 'vscode';
-// import * as lc from 'vscode-languageclient';
 import * as lc from "vscode-languageclient/node";
 import { log } from './log';
 import { sync as commandExistsSync } from 'command-exists';
