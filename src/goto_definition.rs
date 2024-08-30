@@ -10,8 +10,7 @@ use codespan::Span;
 use lsp_server::*;
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
-use move_compiler::parser::lexer::{self, Lexer, Tok};
-use move_ir_types::location::ByteIndex;
+use move_compiler::parser::lexer::{Lexer, Tok};
 use move_model::{
     ast::{ExpData::*, Operation::*, Pattern as MoveModelPattern, Spec, SpecBlockTarget},
     model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, ModuleId, NodeId, StructId},
@@ -127,7 +126,7 @@ impl Handler {
                 }
             }
         }
-        false
+        loc.span().start() <= self.mouse_span.end() && self.mouse_span.end() <= loc.span().end()
     }
 
     fn convert_to_locations(&mut self) -> Vec<Location> {
@@ -208,6 +207,32 @@ impl Handler {
             mouse_line_first_col.span().start(),
             mouse_line_last_col.span().start(),
         );
+    }
+
+    fn get_mouse_token_span(&mut self, env: &GlobalEnv, capture_loc: &move_model::model::Loc) -> (usize, usize) {
+        if let Ok(ty_str) = env.get_source(&capture_loc) {
+            let mut lexer = Lexer::new(ty_str, FileHash::new(ty_str));
+            let mut capture_start_pos = 0;
+            let mut capture_end_pos = 0;
+            if !lexer.advance().is_err() {
+                while lexer.peek() != Tok::EOF {
+                    let token_start_pos = lexer.start_loc() + usize::from(capture_loc.span().start());
+                    if token_start_pos <= self.mouse_span.end().into()
+                        && usize::from(self.mouse_span.end())
+                            <= token_start_pos + lexer.content().len()
+                    {
+                        capture_start_pos = lexer.start_loc();
+                        capture_end_pos = capture_start_pos + lexer.content().len();
+                        break;
+                    }
+                    if lexer.advance().is_err() {
+                        break;
+                    }
+                }
+            }
+            return (capture_start_pos, capture_end_pos);
+        }
+        (0, (capture_loc.span().end() - capture_loc.span().start()).into())
     }
 
     fn remove_not_in_loc(&mut self, env: &GlobalEnv) {
@@ -420,27 +445,55 @@ impl Handler {
                 let capture_ty_start = para.2.span().end();
                 let capture_ty_end = next_para.2.span().start();
 
-                let capture_ty_loc = move_model::model::Loc::new(
+                let mut capture_ty_loc = move_model::model::Loc::new(
                     para.2.file_id(),
                     codespan::Span::new(capture_ty_start, capture_ty_end),
+                );
+
+                let (offset_spos, offset_epos) = self.get_mouse_token_span(env, &capture_ty_loc);
+                capture_ty_loc = move_model::model::Loc::new(
+                    para.2.file_id(),
+                    codespan::Span::new(capture_ty_start + codespan::ByteOffset(offset_spos as i64), capture_ty_start + codespan::ByteOffset(offset_epos as i64)),
+                );
+                if !self.check_move_model_loc_contains_mouse_pos(env, &capture_ty_loc) {
+                    continue;
+                }
+                let capture_ty_src = env.get_source(&capture_ty_loc);
+                log::info!(
+                    "process_parameter -- capture_ty_src 11 = {:?}",
+                    capture_ty_src
                 );
                 self.process_type(env, &capture_ty_loc, &para.1);
             } else {
                 let capture_ty_start = para.2.span().end();
-                let capture_ty_end = target_fun.get_loc().span().end();
+                let capture_ty_end = if let Some(exp) = target_fun.get_def().as_deref() {
+                    let exp_loc = env.get_node_loc(exp.node_id());
+                    exp_loc.span().end()
+                } else {
+                    target_fun.get_loc().span().end()
+                };
                 let capture_ty_loc = move_model::model::Loc::new(
                     para.2.file_id(),
                     codespan::Span::new(capture_ty_start, capture_ty_end),
                 );
-                let ty_source = env.get_source(&capture_ty_loc);
-                if let Ok(ty_str) = ty_source {
+                if let Ok(ty_str) = env.get_source(&capture_ty_loc) {
                     let mut colon_vec = vec![];
                     let mut r_paren_vec = vec![];
                     let mut l_brace_vec = vec![];
                     let mut lexer = Lexer::new(ty_str, FileHash::new(ty_str));
+                    let mut capture_ty_start_pos = 0;
                     let mut capture_ty_end_pos = 0;
                     if !lexer.advance().is_err() {
                         while lexer.peek() != Tok::EOF {
+                            let token_start_pos = lexer.start_loc() + usize::from(capture_ty_start);
+                            if token_start_pos <= self.mouse_span.end().into()
+                                && usize::from(self.mouse_span.end())
+                                    <= token_start_pos + lexer.content().len()
+                            {
+                                capture_ty_start_pos = lexer.start_loc();
+                                capture_ty_end_pos = capture_ty_start_pos + lexer.content().len();
+                                break;
+                            }
                             if lexer.peek() == Tok::Colon {
                                 if !colon_vec.is_empty() {
                                     capture_ty_end_pos = lexer.start_loc();
@@ -466,17 +519,21 @@ impl Handler {
                     let capture_ty_loc = move_model::model::Loc::new(
                         para.2.file_id(),
                         codespan::Span::new(
-                            capture_ty_start,
+                            capture_ty_start + codespan::ByteOffset(capture_ty_start_pos as i64),
                             capture_ty_start + codespan::ByteOffset(capture_ty_end_pos as i64),
                         ),
+                    );
+                    if !self.check_move_model_loc_contains_mouse_pos(env, &capture_ty_loc) {
+                        continue;
+                    }
+                    let capture_ty_src = env.get_source(&capture_ty_loc);
+                    log::info!(
+                        "process_parameter -- capture_ty_src 22 = {:?}",
+                        capture_ty_src
                     );
                     self.process_type(env, &capture_ty_loc, &para.1);
                 }
             }
-            if !self.check_move_model_loc_contains_mouse_pos(env, &para.2) {
-                continue;
-            }
-            self.process_type(env, &para.2, &para.1);
         }
     }
 
@@ -501,11 +558,10 @@ impl Handler {
             );
         }
 
-        let capture_ty_src = env.get_source(&capture_ty_loc);
-        log::info!("capture_ty_src 11 = {:?}", capture_ty_src);
-
-        let fn_source = env.get_source(&capture_ty_loc);
-        if let Ok(fn_str) = fn_source {
+        if !self.check_move_model_loc_contains_mouse_pos(env, &capture_ty_loc) {
+            return;
+        }
+        if let Ok(fn_str) = env.get_source(&capture_ty_loc) {
             let mut r_paren_vec = vec![];
             let mut l_brace_vec = vec![];
             let mut lexer = Lexer::new(fn_str, FileHash::new(fn_str));
@@ -557,23 +613,35 @@ impl Handler {
                 ),
             );
 
-            log::info!("capture_ty_src 22 = {:?}", env.get_source(&capture_ty_loc));
-            self.process_type(env, &capture_ty_loc, &ret_ty_vec);
-
+            if self.check_move_model_loc_contains_mouse_pos(env, &capture_ty_loc) {
+                log::info!(
+                    "process_return_type -- capture_ty_src = {:?}",
+                    env.get_source(&capture_ty_loc)
+                );
+                self.process_type(env, &capture_ty_loc, &ret_ty_vec);
+            }
+            
             if let Some(specifiers) = specifier_vec {
-                eprintln!("specifier = {:?}", specifiers);
+                log::info!("specifier = {:?}", specifiers);
                 for specifier in specifiers {
                     if let move_model::ast::ResourceSpecifier::Resource(struct_id) =
                         &specifier.resource.1
                     {
-                        self.process_type(env, &specifier.resource.0, &struct_id.to_type());
+                        if self.check_move_model_loc_contains_mouse_pos(env, &specifier.resource.0) {
+                            log::info!(
+                                "process_specifier -- specifier.resource = {:?}",
+                                env.get_source(&specifier.resource.0)
+                            );
+                            self.process_type(env, &specifier.resource.0, &struct_id.to_type());
+                        }
                     }
                 }
             }
+
             if let Some(requires) = require_vec {
-                eprintln!("requires = {:?}", requires);
+                log::info!("requires = {:?}", requires);
                 for strct_id in requires {
-                    eprintln!(
+                    log::info!(
                         "strct_id = {:?}",
                         target_fun
                             .module_env
@@ -701,7 +769,10 @@ impl Handler {
                             }
                             log::info!("atomic_field_source = {:?}", atomic_field_source);
                             let field_type = field_env.get_type();
-                            self.process_type(env, &atomic_field_loc, &field_type);
+                            if self.check_move_model_loc_contains_mouse_pos(env, &atomic_field_loc)
+                            {
+                                self.process_type(env, &atomic_field_loc, &field_type);
+                            }
                         }
                     }
                 }
@@ -913,7 +984,9 @@ impl Handler {
                             );
                         }
                     }
-                    self.process_type(env, &generic_ty_loc, inst);
+                    if self.check_move_model_loc_contains_mouse_pos(env, &generic_ty_loc) {
+                        self.process_type(env, &generic_ty_loc, inst);
+                    }
                 }
             }
         }
@@ -971,7 +1044,9 @@ impl Handler {
                             );
                         }
                     }
-                    self.process_type(env, &generic_ty_loc, inst);
+                    if self.check_move_model_loc_contains_mouse_pos(env, &generic_ty_loc) {
+                        self.process_type(env, &generic_ty_loc, inst);
+                    }
                 }
             }
         }
@@ -1119,7 +1194,7 @@ impl Handler {
         env: &GlobalEnv,
         capture_items_loc: &move_model::model::Loc,
         ty: &move_model::ty::Type,
-    ) {
+    ) -> bool {
         log::trace!("process_type ============= ");
         use move_model::ty::Type::*;
         match ty {
@@ -1134,40 +1209,27 @@ impl Handler {
                 self.process_type(env, capture_items_loc, type_ptr);
             }
             Struct(mid, stid, ty_vec) => {
-                let struct_from_module = env.get_module(*mid);
-                let type_struct = struct_from_module.get_struct(*stid);
-                log::info!(
-                    "process_type -->> type_struct = {:?}",
-                    type_struct.get_full_name_str()
-                );
-
-                let mut capture_generic_ty_src = "".to_string();
-                let capture_generic_ty_source = env.get_source(capture_items_loc);
-                if let Ok(capture_generic_ty_str) = capture_generic_ty_source {
-                    capture_generic_ty_src = capture_generic_ty_str.to_string();
+                let mut found_target = false;
+                let mut capture_ty_src = "".to_string();
+                let capture_ty_source = env.get_source(capture_items_loc);
+                if let Ok(capture_ty_str) = capture_ty_source {
+                    capture_ty_src = capture_ty_str.to_string();
                 }
-                if type_struct
-                    .get_full_name_str()
-                    .contains(&capture_generic_ty_src)
-                {
-                    self.insert_result(env, &type_struct.get_loc(), capture_items_loc);
-                }
-
                 for ty in ty_vec {
-                    if let Some(generic_struct_ty) = ty.get_struct(env) {
-                        let generic_struct_ty_symbol = generic_struct_ty.0.get_name();
-                        let capture_generic_ty_source = env.get_source(capture_items_loc);
-                        let generic_struct_ty_symbol_display =
-                            generic_struct_ty_symbol.display(env.symbol_pool());
-                        log::info!(
-                            "generic_struct_ty_symbol_display = {:?}",
-                            generic_struct_ty_symbol_display.to_string()
-                        );
-                        if let Some(index) = capture_generic_ty_src
-                            .find(generic_struct_ty_symbol_display.to_string().as_str())
-                        {
-                            let capture_generic_ty_str_len =
-                                generic_struct_ty_symbol_display.to_string().len();
+                    if found_target {
+                        return true;
+                    }
+                    if let Some((generic_ty, nested_generic_ty_slice)) = ty.get_struct(env) {
+                        for nested_generic_ty in nested_generic_ty_slice {
+                            if self.process_type(env, capture_items_loc, nested_generic_ty) {
+                                return true;
+                            }
+                        }
+                        let generic_struct_ty_str =
+                            generic_ty.get_name().display(env.symbol_pool()).to_string();
+                        log::info!("generic_struct_ty_str = {:?}", generic_struct_ty_str);
+                        if let Some(index) = capture_ty_src.find(generic_struct_ty_str.as_str()) {
+                            let capture_generic_ty_str_len = generic_struct_ty_str.len();
                             let capture_generic_ty_start = (*capture_items_loc).span().start()
                                 + codespan::ByteOffset(index.try_into().unwrap());
                             let capture_generic_ty_end = capture_generic_ty_start
@@ -1181,17 +1243,38 @@ impl Handler {
                                     capture_generic_ty_end,
                                 ),
                             );
-                            log::trace!(
+                            log::info!(
                                 "capture_generic_ty_str = {:?}",
                                 env.get_source(&capture_generic_ty_loc)
                             );
-                            self.insert_result(
-                                env,
-                                &generic_struct_ty.0.get_loc(),
-                                &capture_generic_ty_loc,
-                            );
+                            if capture_generic_ty_loc.span().start() <= self.mouse_span.end()
+                            && self.mouse_span.end() <= capture_generic_ty_loc.span().end() {
+                                self.insert_result(env, &generic_ty.get_loc(), &capture_generic_ty_loc);
+                                found_target = true;
+                            }
                         }
+
+                    } else {
+                        self.process_type(env, capture_items_loc, ty);
                     }
+                }
+
+                if found_target {
+                    return true;
+                }
+                let struct_from_module = env.get_module(*mid);
+                let type_struct = struct_from_module.get_struct(*stid);
+                let struct_ty_str = type_struct
+                    .get_name()
+                    .display(env.symbol_pool())
+                    .to_string();
+                log::info!("process_type -->> struct_ty_str = {:?}", struct_ty_str);
+                // if type_struct
+                //     .get_full_name_str()
+                //     .ends_with(&capture_ty_src)
+                if capture_ty_src.contains(&struct_ty_str) {
+                    self.insert_result(env, &type_struct.get_loc(), capture_items_loc);
+                    return true;
                 }
             }
             TypeParameter(..) => {
@@ -1218,6 +1301,7 @@ impl Handler {
                 log::trace!(">> type_var is default");
             }
         }
+        false
     }
 
     fn run_move_model_visitor_internal(&mut self, env: &GlobalEnv, move_file_path: &Path) {
