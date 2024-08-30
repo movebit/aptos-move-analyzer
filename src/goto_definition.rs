@@ -209,14 +209,19 @@ impl Handler {
         );
     }
 
-    fn get_mouse_token_span(&mut self, env: &GlobalEnv, capture_loc: &move_model::model::Loc) -> (usize, usize) {
+    fn get_mouse_token_span(
+        &mut self,
+        env: &GlobalEnv,
+        capture_loc: &move_model::model::Loc,
+    ) -> (usize, usize) {
         if let Ok(ty_str) = env.get_source(&capture_loc) {
             let mut lexer = Lexer::new(ty_str, FileHash::new(ty_str));
             let mut capture_start_pos = 0;
             let mut capture_end_pos = 0;
             if !lexer.advance().is_err() {
                 while lexer.peek() != Tok::EOF {
-                    let token_start_pos = lexer.start_loc() + usize::from(capture_loc.span().start());
+                    let token_start_pos =
+                        lexer.start_loc() + usize::from(capture_loc.span().start());
                     if token_start_pos <= self.mouse_span.end().into()
                         && usize::from(self.mouse_span.end())
                             <= token_start_pos + lexer.content().len()
@@ -232,7 +237,10 @@ impl Handler {
             }
             return (capture_start_pos, capture_end_pos);
         }
-        (0, (capture_loc.span().end() - capture_loc.span().start()).into())
+        (
+            0,
+            (capture_loc.span().end() - capture_loc.span().start()).into(),
+        )
     }
 
     fn remove_not_in_loc(&mut self, env: &GlobalEnv) {
@@ -453,7 +461,10 @@ impl Handler {
                 let (offset_spos, offset_epos) = self.get_mouse_token_span(env, &capture_ty_loc);
                 capture_ty_loc = move_model::model::Loc::new(
                     para.2.file_id(),
-                    codespan::Span::new(capture_ty_start + codespan::ByteOffset(offset_spos as i64), capture_ty_start + codespan::ByteOffset(offset_epos as i64)),
+                    codespan::Span::new(
+                        capture_ty_start + codespan::ByteOffset(offset_spos as i64),
+                        capture_ty_start + codespan::ByteOffset(offset_epos as i64),
+                    ),
                 );
                 if !self.check_move_model_loc_contains_mouse_pos(env, &capture_ty_loc) {
                     continue;
@@ -620,14 +631,15 @@ impl Handler {
                 );
                 self.process_type(env, &capture_ty_loc, &ret_ty_vec);
             }
-            
+
             if let Some(specifiers) = specifier_vec {
                 log::info!("specifier = {:?}", specifiers);
                 for specifier in specifiers {
                     if let move_model::ast::ResourceSpecifier::Resource(struct_id) =
                         &specifier.resource.1
                     {
-                        if self.check_move_model_loc_contains_mouse_pos(env, &specifier.resource.0) {
+                        if self.check_move_model_loc_contains_mouse_pos(env, &specifier.resource.0)
+                        {
                             log::info!(
                                 "process_specifier -- specifier.resource = {:?}",
                                 env.get_source(&specifier.resource.0)
@@ -1026,45 +1038,6 @@ impl Handler {
                 );
                 let called_fun_loc = called_fun.get_loc();
                 self.insert_result(env, &called_fun_loc, &this_call_loc);
-
-                let inst_vec = &env.get_node_instantiation(*node_id);
-                for inst in inst_vec {
-                    let mut generic_ty_loc = this_call_loc.clone();
-                    let capture_call_source = env.get_source(&this_call_loc);
-                    if let Ok(capture_call_source_str) = capture_call_source {
-                        if let Some(index) = capture_call_source_str.find("<".to_string().as_str())
-                        {
-                            generic_ty_loc = move_model::model::Loc::new(
-                                this_call_loc.file_id(),
-                                codespan::Span::new(
-                                    this_call_loc.span().start()
-                                        + codespan::ByteOffset(index.try_into().unwrap()),
-                                    this_call_loc.span().end(),
-                                ),
-                            );
-                        }
-                    }
-                    if self.check_move_model_loc_contains_mouse_pos(env, &generic_ty_loc) {
-                        self.process_type(env, &generic_ty_loc, inst);
-                    }
-                }
-            }
-        }
-
-        if let Call(node_id, BorrowGlobal(..), _) = expdata {
-            let this_call_loc = env.get_node_loc(*node_id);
-            log::trace!(
-                ">> exp.visit this_call_loc = {:?}",
-                env.get_location(&this_call_loc)
-            );
-            if this_call_loc.span().start() < self.mouse_span.end()
-                && self.mouse_span.end() < this_call_loc.span().end()
-            {
-                let inst_vec = &env.get_node_instantiation(*node_id);
-                for inst in inst_vec {
-                    log::info!(">> inst = {:?}", inst);
-                    self.process_type(env, &this_call_loc, inst);
-                }
             }
         }
 
@@ -1119,6 +1092,36 @@ impl Handler {
             let pack_struct = pack_module.get_struct(*sid);
             let pack_struct_loc = pack_struct.get_loc();
             self.insert_result(env, &pack_struct_loc, &this_call_loc);
+        }
+
+        // builtin fun -- move_model::ast::Operation::{MoveFrom, MoveTo, Exists, Borrow, BorrowGlobal};
+        if let Call(node_id, _, _) = expdata {
+            let this_call_loc = env.get_node_loc(*node_id);
+            log::info!(
+                ">> exp.visit this_call_loc = {:?}",
+                env.get_location(&this_call_loc)
+            );
+            if this_call_loc.span().start() < self.mouse_span.end()
+                && self.mouse_span.end() < this_call_loc.span().end()
+            {
+                let inst_vec = &env.get_node_instantiation(*node_id);
+                for inst in inst_vec {
+                    let mut generic_ty_loc = this_call_loc.clone();
+                    let capture_ty_start = generic_ty_loc.span().start();
+                    let (offset_spos, offset_epos) =
+                        self.get_mouse_token_span(env, &generic_ty_loc);
+                    generic_ty_loc = move_model::model::Loc::new(
+                        this_call_loc.file_id(),
+                        codespan::Span::new(
+                            capture_ty_start + codespan::ByteOffset(offset_spos as i64),
+                            capture_ty_start + codespan::ByteOffset(offset_epos as i64),
+                        ),
+                    );
+                    if self.check_move_model_loc_contains_mouse_pos(env, &generic_ty_loc) {
+                        self.process_type(env, &generic_ty_loc, inst);
+                    }
+                }
+            }
         }
     }
 
@@ -1248,12 +1251,16 @@ impl Handler {
                                 env.get_source(&capture_generic_ty_loc)
                             );
                             if capture_generic_ty_loc.span().start() <= self.mouse_span.end()
-                            && self.mouse_span.end() <= capture_generic_ty_loc.span().end() {
-                                self.insert_result(env, &generic_ty.get_loc(), &capture_generic_ty_loc);
+                                && self.mouse_span.end() <= capture_generic_ty_loc.span().end()
+                            {
+                                self.insert_result(
+                                    env,
+                                    &generic_ty.get_loc(),
+                                    &capture_generic_ty_loc,
+                                );
                                 found_target = true;
                             }
                         }
-
                     } else {
                         self.process_type(env, capture_items_loc, ty);
                     }
@@ -1269,9 +1276,6 @@ impl Handler {
                     .display(env.symbol_pool())
                     .to_string();
                 log::info!("process_type -->> struct_ty_str = {:?}", struct_ty_str);
-                // if type_struct
-                //     .get_full_name_str()
-                //     .ends_with(&capture_ty_src)
                 if capture_ty_src.contains(&struct_ty_str) {
                     self.insert_result(env, &type_struct.get_loc(), capture_items_loc);
                     return true;
