@@ -788,7 +788,7 @@ impl Handler {
             }
         }
 
-        if let Call(node_id, Pack(mid, sid), args) = expdata {
+        if let Call(node_id, Pack(mid, sid, _), args) = expdata {
             let this_call_loc = env.get_node_loc(*node_id);
             log::trace!(
                 ">> exp.visit this_call_loc = {:?}",
@@ -899,7 +899,7 @@ impl Handler {
                     self.process_temporary_for_function_para(env, &this_call_loc);
                 }
             }
-            MoveModelPattern::Struct(node_id, q_id, pattern_vec) => {
+            MoveModelPattern::Struct(node_id, q_id, _, pattern_vec) => {
                 let this_call_loc = env.get_node_loc(*node_id);
                 if this_call_loc.span().start() > self.mouse_span.end()
                     || self.mouse_span.end() > this_call_loc.span().end()
@@ -1135,7 +1135,7 @@ impl Handler {
             if let Some(exp) = fun.get_def().as_deref() {
                 exp.visit_pre_order(&mut |exp| {
                     match exp {
-                        Call(node_id, Pack(mid, sid), _) => {
+                        Call(node_id, Pack(mid, sid, _), _) => {
                             let mut result_loc = mod_env.env.get_node_loc(*node_id);
                             if let Ok(pack_struct_str) = mod_env.env.get_source(&result_loc) {
                                 log::info!("pack_struct_str = {:?}", pack_struct_str);
@@ -1201,7 +1201,7 @@ impl Handler {
                 exp.visit_pre_order(&mut |exp| {
                     match exp {
                         Block(_, pattern, _, _) | Assign(_, pattern, _) => {
-                            if let MoveModelPattern::Struct(node_id, q_id, _) = pattern {
+                            if let MoveModelPattern::Struct(node_id, q_id, ..) = pattern {
                                 let mut result_loc = mod_env.env.get_node_loc(*node_id);
                                 if let Ok(unpack_struct_str) = mod_env.env.get_source(&result_loc) {
                                     log::info!("unpack_struct_str = {:?}", unpack_struct_str);

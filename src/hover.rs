@@ -578,7 +578,7 @@ impl Handler {
 
     fn match_pattern(&mut self, env: &GlobalEnv, pattern: &Pattern) {
         match pattern {
-            Pattern::Struct(node_id, q_sid, vec_p) => {
+            Pattern::Struct(node_id, q_sid, _, vec_p) => {
                 let this_loc = env.get_node_loc(*node_id);
                 if this_loc.span().start() > self.mouse_span.end()
                     || self.mouse_span.end() > this_loc.span().end()
@@ -728,7 +728,7 @@ impl Handler {
             }
         }
 
-        if let Call(node_id, Pack(mid, sid), _) = expdata {
+        if let Call(node_id, Pack(mid, sid, _), _) = expdata {
             let op_loc = env.get_node_loc(*node_id);
             if op_loc.span().start() > self.mouse_span.end()
                 || self.mouse_span.end() > op_loc.span().end()

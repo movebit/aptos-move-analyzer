@@ -7,7 +7,8 @@ use anyhow::{Ok, Result};
 use codespan_reporting::diagnostic::Severity;
 use move_compiler::shared::{NumericalAddress, PackagePaths};
 use move_core_types::account_address::*;
-use move_model::{options::ModelBuilderOptions, run_model_builder_with_options};
+use move_model::metadata::LanguageVersion;
+use move_model::PackageInfo;
 use move_package::source_package::{layout::SourcePackageLayout, manifest_parser::*};
 use num_bigint::BigUint;
 use std::{
@@ -153,11 +154,12 @@ impl Project {
             .extract_named_address_mapping()
             .map(|(name, addr)| format!("{}={}", name.as_str(), addr))
             .collect();
-        let addrs = parse_addresses_from_options(named_address_mapping)?;
+        let addrs = parse_addresses_from_options(named_address_mapping.clone())?;
 
         let targets = vec![PackagePaths {
             name: None,
             paths: targets_paths
+                .clone()
                 .into_iter()
                 .map(|p| p.to_string_lossy().to_string())
                 .collect::<Vec<_>>(),
@@ -167,6 +169,7 @@ impl Project {
         let dependents = vec![PackagePaths {
             name: None,
             paths: dependents_paths
+                .clone()
                 .into_iter()
                 .map(|p| p.to_string_lossy().to_string())
                 .collect::<Vec<_>>(),
@@ -176,17 +179,49 @@ impl Project {
         let attributes: BTreeSet<String> = Default::default();
         new_project.targets = targets.clone();
         new_project.dependents = dependents.clone();
-        new_project.global_env = run_model_builder_with_options(
-            targets,
-            dependents,
-            ModelBuilderOptions {
-                compile_via_model: true,
-                ..Default::default()
-            },
-            false,
-            &attributes,
-        )
-        .expect("Failed to create GlobalEnv!");
+
+        {
+            // info!("Type Checking");
+            // Run the model builder, which performs context checking.
+            let addrs = move_model::parse_addresses_from_options(named_address_mapping.clone())?;
+            new_project.global_env = move_model::run_model_builder_in_compiler_mode(
+                PackageInfo {
+                    sources: targets_paths
+                        .clone()
+                        .into_iter()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .collect::<Vec<_>>(),
+                    address_map: addrs.clone(),
+                },
+                PackageInfo {
+                    sources: vec![],
+                    address_map: addrs.clone(),
+                },
+                vec![PackageInfo {
+                    sources: dependents_paths
+                        .clone()
+                        .into_iter()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .collect::<Vec<_>>(),
+                    address_map: addrs.clone(),
+                }],
+                true,
+                &attributes,
+                LanguageVersion::V2_1,
+                true,
+                false,
+                true,
+                true,
+            )?;
+
+            // // Store address aliases
+            // let map = addrs
+            //     .into_iter()
+            //     .map(|(s, a)| (env.symbol_pool().make(&s), a.into_inner()))
+            //     .collect();
+            // env.set_address_alias_map(map);
+        }
+
         log::info!(
             "env.get_module_count() = {:?}",
             &new_project.global_env.get_module_count()

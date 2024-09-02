@@ -109,6 +109,7 @@ pub fn get_shadows(exp: &MoveModelExp, env: &GlobalEnv, shadows: &mut ShadowItem
         MoveModelExpData::Assign(_, _, _) => {}
         MoveModelExpData::Mutate(_, _, _) => {}
         MoveModelExpData::SpecBlock(_, _) => {}
+        MoveModelExpData::Match(..) => {}
     }
 }
 
@@ -291,7 +292,7 @@ impl FunSpecGenerator {
                     self.collect_spec_exp_(ret, exp, env);
                 }
             }
-            Operation::Pack(_, _) => {
+            Operation::Pack(..) => {
                 for exp in vec_exp.iter() {
                     self.collect_spec_exp_(ret, exp, env);
                 }

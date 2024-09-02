@@ -1077,7 +1077,7 @@ impl Handler {
             }
         }
 
-        if let Call(node_id, Pack(mid, sid), _) = expdata {
+        if let Call(node_id, Pack(mid, sid, _), _) = expdata {
             let this_call_loc = env.get_node_loc(*node_id);
             log::trace!(
                 ">> exp.visit this_call_loc = {:?}",
@@ -1147,7 +1147,7 @@ impl Handler {
                     self.process_temporary_for_function_para(env, &this_call_loc);
                 }
             }
-            MoveModelPattern::Struct(node_id, q_id, _) => {
+            MoveModelPattern::Struct(node_id, q_id, ..) => {
                 let this_call_loc = env.get_node_loc(*node_id);
                 if this_call_loc.span().start() > self.mouse_span.end()
                     || self.mouse_span.end() > this_call_loc.span().end()
