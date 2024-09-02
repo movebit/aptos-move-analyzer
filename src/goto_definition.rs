@@ -300,15 +300,13 @@ impl Handler {
             if !self.check_move_model_loc_contains_mouse_pos(env, &use_decl.loc) {
                 continue;
             }
-            log::info!(
-                "find use decl module, line: {}",
-                use_decl.loc.span().start()
-            );
+            let (_, use_pos) = env.get_file_and_location(&use_decl.loc).unwrap();
+            log::info!("find use decl module, line: {}", use_pos.line);
 
             let used_module_name = use_decl.module_name.display_full(env).to_string();
             let before_after = used_module_name.split("::").collect::<Vec<_>>();
-            if before_after.len() != 2 {
-                log::error!("use decl module name len should be 2");
+            if before_after.len() < 2 {
+                log::error!("use decl module name len should >= 2");
                 continue;
             }
 
@@ -326,7 +324,7 @@ impl Handler {
 
             if !use_decl.members.is_empty() {
                 for (member_loc, name, _alias_name) in use_decl.members.clone().into_iter() {
-                    log::trace!("member_loc = {:?} ---", env.get_location(&member_loc));
+                    log::info!("member_loc = {:?} ---", env.get_location(&member_loc));
                     if self.check_move_model_loc_contains_mouse_pos(env, &member_loc) {
                         target_stct_or_fn = name.display(spool).to_string();
                         found_target_stct_or_fn = true;
@@ -335,6 +333,9 @@ impl Handler {
                         break;
                     }
                 }
+            } else {
+                target_stct_or_fn = before_after[1].to_string();
+                found_target_stct_or_fn = true;
             }
             if found_target_stct_or_fn {
                 break;
@@ -348,6 +349,7 @@ impl Handler {
         let mut option_use_module: Option<ModuleEnv<'_>> = None;
         for mo_env in env.get_modules() {
             let mo_name_str = mo_env.get_name().display_full(env).to_string();
+            log::info!("addrnum_with_module_name = {:?}, mo_name_str = {:?}", addrnum_with_module_name, mo_name_str);
             if addrnum_with_module_name.len() != mo_name_str.len() {
                 continue;
             }
@@ -363,16 +365,18 @@ impl Handler {
             None => return,
         };
 
+        self.get_mouse_loc(env, &capture_items_loc);
         if found_target_stct_or_fn {
             log::info!("finding use decl module member...");
             for stct in use_decl_module.get_structs() {
-                log::trace!(
+                log::info!(
                     "per_struct_name = {:?}, target_struct: {}",
                     stct.get_full_name_str(),
                     target_stct_or_fn
                 );
                 if stct.get_full_name_str().contains(&target_stct_or_fn) {
                     log::info!("stct.get_full_name_str() = {:?}", stct.get_full_name_str());
+                    log::info!("insert_result<use_decl> = {:?}", env.get_source(&capture_items_loc));
                     self.insert_result(env, &stct.get_loc(), &capture_items_loc);
                     return;
                 }
@@ -385,6 +389,7 @@ impl Handler {
                 );
                 if func.get_name_str().contains(&target_stct_or_fn) {
                     log::info!("func.get_name_str() = {:?}", func.get_name_str());
+                    log::info!("insert_result<use_decl> = {:?}", env.get_source(&capture_items_loc));
                     self.insert_result(env, &func.get_loc(), &capture_items_loc);
                     return;
                 }
