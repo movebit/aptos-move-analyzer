@@ -7,6 +7,7 @@ use crate::{
     utils::{path_concat, FileRange},
 };
 use codespan::Span;
+use itertools::Itertools;
 use lsp_server::*;
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
@@ -349,7 +350,11 @@ impl Handler {
         let mut option_use_module: Option<ModuleEnv<'_>> = None;
         for mo_env in env.get_modules() {
             let mo_name_str = mo_env.get_name().display_full(env).to_string();
-            log::info!("addrnum_with_module_name = {:?}, mo_name_str = {:?}", addrnum_with_module_name, mo_name_str);
+            log::info!(
+                "addrnum_with_module_name = {:?}, mo_name_str = {:?}",
+                addrnum_with_module_name,
+                mo_name_str
+            );
             if addrnum_with_module_name.len() != mo_name_str.len() {
                 continue;
             }
@@ -376,7 +381,10 @@ impl Handler {
                 );
                 if stct.get_full_name_str().contains(&target_stct_or_fn) {
                     log::info!("stct.get_full_name_str() = {:?}", stct.get_full_name_str());
-                    log::info!("insert_result<use_decl> = {:?}", env.get_source(&capture_items_loc));
+                    log::info!(
+                        "insert_result<use_decl> = {:?}",
+                        env.get_source(&capture_items_loc)
+                    );
                     self.insert_result(env, &stct.get_loc(), &capture_items_loc);
                     return;
                 }
@@ -389,7 +397,10 @@ impl Handler {
                 );
                 if func.get_name_str().contains(&target_stct_or_fn) {
                     log::info!("func.get_name_str() = {:?}", func.get_name_str());
-                    log::info!("insert_result<use_decl> = {:?}", env.get_source(&capture_items_loc));
+                    log::info!(
+                        "insert_result<use_decl> = {:?}",
+                        env.get_source(&capture_items_loc)
+                    );
                     self.insert_result(env, &func.get_loc(), &capture_items_loc);
                     return;
                 }
@@ -725,7 +736,7 @@ impl Handler {
     }
 
     fn process_struct(&mut self, env: &GlobalEnv) {
-        log::info!("process_struct for goto definition");
+        log::info!(">> process_struct for goto definition");
         let mut found_target_struct = false;
         let mut target_struct_id = StructId::new(env.symbol_pool().make("name"));
         let target_module = env.get_module(self.target_module_id);
@@ -753,48 +764,44 @@ impl Handler {
         let target_struct_loc = target_struct.get_loc();
         self.get_mouse_loc(env, &target_struct_loc);
 
-        for field_env in target_struct.get_fields() {
-            let field_name = field_env.get_name();
-            let field_name_str = field_name.display(env.symbol_pool());
-            log::trace!("field_name = {}", field_name_str);
-            let struct_source = env.get_source(&target_struct_loc);
-            if let Ok(struct_str) = struct_source {
-                if let Some(index) = struct_str.find(field_name_str.to_string().as_str()) {
-                    let field_len = field_name_str.to_string().len();
-                    let field_start = target_struct_loc.span().start()
-                        + codespan::ByteOffset((index + field_len).try_into().unwrap());
-                    // Assuming a relatively large distance
-                    let field_end = field_start + codespan::ByteOffset((128).try_into().unwrap());
-                    let field_loc = move_model::model::Loc::new(
-                        target_struct_loc.file_id(),
-                        codespan::Span::new(field_start, field_end),
-                    );
-                    let field_source = env.get_source(&field_loc);
-                    if let Ok(atomic_field_str) = field_source {
-                        if let Some(index) = atomic_field_str.find("\n".to_string().as_str()) {
-                            let atomic_field_end =
-                                field_start + codespan::ByteOffset(index.try_into().unwrap());
-                            let atomic_field_loc = move_model::model::Loc::new(
-                                target_struct_loc.file_id(),
-                                codespan::Span::new(field_start, atomic_field_end),
-                            );
-                            let atomic_field_source = env.get_source(&atomic_field_loc);
-                            if atomic_field_loc.span().end() < self.mouse_span.end()
-                                || atomic_field_loc.span().start() > self.mouse_span.end()
-                            {
-                                continue;
-                            }
-                            log::info!("atomic_field_source = {:?}", atomic_field_source);
-                            let field_type = field_env.get_type();
-                            if self.check_move_model_loc_contains_mouse_pos(env, &atomic_field_loc)
-                            {
-                                self.process_type(env, &atomic_field_loc, &field_type);
-                            }
-                        }
-                    }
+        let (offset_spos, offset_epos) = self.get_mouse_token_span(env, &target_struct_loc);
+        if offset_spos == 0
+            && codespan::ByteOffset(offset_epos as i64)
+                == target_struct_loc.span().end() - target_struct_loc.span().start()
+        {
+            return;
+        }
+        let capture_field_start = target_struct_loc.span().start();
+        let atomic_field_loc = move_model::model::Loc::new(
+            target_struct_loc.file_id(),
+            codespan::Span::new(
+                capture_field_start + codespan::ByteOffset(offset_spos as i64),
+                capture_field_start + codespan::ByteOffset(offset_epos as i64),
+            ),
+        );
+        log::info!(
+            "atomic_field_source = {:?}",
+            env.get_source(&atomic_field_loc)
+        );
+
+        let field_env_vec = target_struct.get_fields().collect_vec();
+        for (i, field_env) in field_env_vec.iter().enumerate() {
+            if field_env.get_loc().span().start() > atomic_field_loc.span().end() {
+                break;
+            }
+            if i < field_env_vec.len() - 1 {
+                let next_field_span = field_env_vec[i + 1].get_loc().span();
+                if next_field_span.end() < atomic_field_loc.span().start() {
+                    continue;
+                }
+            }
+            if self.check_move_model_loc_contains_mouse_pos(env, &atomic_field_loc) {
+                if self.process_type(env, &atomic_field_loc, &field_env.get_type()) {
+                    break;
                 }
             }
         }
+        log::info!("<< process_struct for goto definition");
     }
 
     fn process_spec_struct(&mut self, env: &GlobalEnv) {
