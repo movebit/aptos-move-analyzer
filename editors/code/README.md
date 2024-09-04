@@ -44,7 +44,9 @@ Move source file (a file with a `.move` file extension) and:
 3.If you are unable to install versions 0.3 and above, for example, if you see version 0.3.0 but after installation, only version 0.2.0 is available, it may be due to an outdated version of Visual Studio Code. Versions 0.3 and above require Visual Studio Code version 1.85 or higher. You can check the current version of Visual Studio Code by navigating to "Help" and then selecting "About."
 
 ### How to Install (Must Read)
-The `aptos-move-analyzer` Visual Studio Code extension works via two components: the `aptos-move-analyzer language server` and the extension itself. Below are two steps that describe how to install all of them.
+The `aptos-move-analyzer` Visual Studio Code extension works via two components: the `aptos-move-analyzer language server` and the extension itself. 
+
+Starting from version v1.0.2, this plugin will automatically download the lsp-server, namely the aptos-move-analyzer binary package, when you click to install it from the vscode plugin marketplace. By default, it will be downloaded to the ~/.cargo/bin directory. If for some reason it does not download successfully, you can choose the manual download method explained next.
 
 ### 1. Installing the `aptos-move-analyzer language server`<span id="Step1">
 `aptos-move-analyzer language server` may be installed in one of two ways:
@@ -72,7 +74,7 @@ cargo install --git https://github.com/movebit/aptos-move-analyzer --branch rele
 The installation may take some time, often several minutes. After installation, the `aptos-move-analyzer` program is in your `cargo` binary directory. On macOS and Linux, this directory is usually `~/.cargo/bin`. You should make sure this location is in your `PATH` environment variable via `export PATH="$PATH:~/.cargo/bin"` .
 
 To confirm that you've installed the language server program successfully, execute
-`aptos-move-analyzer --version` on the command line. You should see the output `aptos-move-analyzer version number(1.0.0)`.
+`aptos-move-analyzer --version` on the command line. You should see the output `aptos-move-analyzer version number(1.0.1)`.
 If you don't see it, check the troubleshooting section at the end.
 
 After completing the above steps, **restart** VSCode.
@@ -103,15 +105,12 @@ At this point, the entire plugin is ready to use. The plugin offers a variety of
 Please note: If you don't see the version number, you can refer to the troubleshooting section."
 
 #### [1] cannot find the `aptos-move-analyzer` program
-##### 1) windows
-If you are installing this extension on a Windows system and have followed the steps in Section 1.A by running the windows-installer.msi, but executing `aptos-move-analyzer --version` in the command line doesn't find the `aptos-move-analyzer` program, the issue may be that VSCode cannot locate the configured environment variables. You can try the following:
+##### For Network reason
+You may have the extension look at this location by using the the Visual Studio Code
+settings (⌘, on macOS, or use the menu item Code > Preferences > Settings). Search for the
+aptos-move-analyzer.proxy.addr setting, maybe you should set a proxy server like 127.0.0.1:7890.
 
-   1. Restart VSCode and install the `aptos-move-analyzer` VSCode extension.
-   2. In the Windows system settings, find the user environment variable `PATH`. Look for an entry ending with `MoveBit\aptos-move-analyzer\`, and copy it.
-   3. Open the extension settings for `aptos-move-analyzer` in the VSCode extension store. In the `aptos-move-analyzer > server:path` entry, add the path ending with `MoveBit\aptos-move-analyzer\aptos-move-analyzer.exe` . The final result may look like: `C:\Users\YourUserName\AppData\Local\Apps\MoveBit\aptos-move-analyzer\aptos-move-analyzer.exe`
-   4. Restart a terminal and try running `aptos-move-analyzer --version` in the command line again.
-
-##### 2) mac & linux
+##### For PATH reason
 If you see an error message *language server executable `aptos-move-analyzer` could not be found* in the
 bottom-right of your Visual Studio Code screen when opening a Move file, it means that the
 `aptos-move-analyzer` executable could not be found in your `PATH`. You may try the following:
