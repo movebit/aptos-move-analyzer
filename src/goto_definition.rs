@@ -645,11 +645,12 @@ impl Handler {
                     "process_return_type -- capture_ty_src = {:?}",
                     env.get_source(&capture_ty_loc)
                 );
-                self.process_type(env, &capture_ty_loc, &ret_ty_vec);
+                if self.process_type(env, &capture_ty_loc, &ret_ty_vec) {
+                    return;
+                }
             }
 
             if let Some(specifiers) = specifier_vec {
-                log::info!("specifier = {:?}", specifiers);
                 for specifier in specifiers {
                     if let move_model::ast::ResourceSpecifier::Resource(struct_id) =
                         &specifier.resource.1
@@ -660,7 +661,9 @@ impl Handler {
                                 "process_specifier -- specifier.resource = {:?}",
                                 env.get_source(&specifier.resource.0)
                             );
-                            self.process_type(env, &specifier.resource.0, &struct_id.to_type());
+                            if self.process_type(env, &specifier.resource.0, &struct_id.to_type()) {
+                                return;
+                            }
                         }
                     }
                 }
@@ -669,13 +672,21 @@ impl Handler {
             if let Some(requires) = require_vec {
                 log::info!("requires = {:?}", requires);
                 for strct_id in requires {
-                    log::info!(
-                        "strct_id = {:?}",
-                        target_fun
-                            .module_env
-                            .get_struct(strct_id)
-                            .get_full_name_str()
-                    );
+                    let strct_env = target_fun.module_env.get_struct(strct_id);
+                    let strct_str = strct_env.get_name().display(env.symbol_pool()).to_string();
+                    log::info!("process_type -->> strct_str = {:?}", strct_str);
+                    let capture_ty_src = if let Ok(cap_str) = env.get_source(&capture_ty_loc) {
+                        cap_str
+                    } else {
+                        &""
+                    };
+                    if capture_ty_src.contains(&strct_str) {
+                        self.insert_result(
+                            env,
+                            &target_fun.module_env.get_struct(strct_id).get_loc(),
+                            &capture_ty_loc,
+                        );
+                    }
                 }
             }
         }
