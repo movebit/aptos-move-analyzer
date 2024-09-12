@@ -26,6 +26,7 @@ use lsp_types::{
 };
 use move_command_line_common::files::FileHash;
 use move_compiler::{diagnostics::Diagnostics, PASS_TYPING};
+use move_package::CompilerConfig;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -521,11 +522,18 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
 fn get_package_compile_diagnostics(pkg_path: &Path) -> Result<Diagnostics> {
     use anyhow::*;
     use move_package::compilation::build_plan::BuildPlan;
+    use move_model::metadata::CompilerVersion;
+    use move_model::metadata::LanguageVersion;
     use tempfile::tempdir;
     let build_config = move_package::BuildConfig {
         test_mode: true,
         install_dir: Some(tempdir().unwrap().path().to_path_buf()),
         skip_fetch_latest_git_deps: true,
+        compiler_config: CompilerConfig {
+            compiler_version: Some(CompilerVersion::V2_1),
+            language_version: Some(LanguageVersion::V2_1),
+            ..Default::default()
+        },
         ..Default::default()
     };
     // resolution graph diagnostics are only needed for CLI commands so ignore them by passing a
