@@ -1,4 +1,5 @@
 module Symbols::test_enum {
+    use std::string::String;
     enum Shape {
         Circle {
             radius: u64

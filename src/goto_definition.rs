@@ -795,7 +795,25 @@ impl Handler {
             env.get_source(&atomic_field_loc)
         );
 
-        let field_env_vec = target_struct.get_fields().collect_vec();
+        let mut field_env_vec = target_struct.get_fields().collect_vec();
+        // process enum
+        for enum_field in target_struct.get_variants() {
+            // for variant_attr in target_struct.get_variant_attributes(enum_field) {
+            //     log::info!("variant_attr.name = {:?}", variant_attr.name());
+            // }
+            let variant_loc = target_struct.get_variant_loc(enum_field);
+            if variant_loc.span().start() <= atomic_field_loc.span().start()
+                && atomic_field_loc.span().end() <= variant_loc.span().end()
+            {
+                let variant_str = env.get_source(&variant_loc);
+                log::info!("variant_str = {:?}", variant_str);
+                for field_env in target_struct.get_fields_of_variant(enum_field) {
+                    field_env_vec.push(field_env);
+                }
+                break;
+            }
+        }
+
         for (i, field_env) in field_env_vec.iter().enumerate() {
             if field_env.get_loc().span().start() > atomic_field_loc.span().end() {
                 break;

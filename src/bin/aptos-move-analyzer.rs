@@ -337,7 +337,7 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
             return;
         }
     };
-    log::info!("report_diag -------------");
+    log::error!("report_diag -------------");
 
     let mut result: HashMap<Url, Vec<lsp_types::Diagnostic>> = HashMap::new();
     let diag_err = proj.err_diags.clone();
@@ -395,6 +395,7 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
         let url = url::Url::from_file_path(PathBuf::from(file_path).as_path()).unwrap();
         result.insert(url, vec![d]);
     }
+    log::error!("result = {:?}", result);
     for (k, v) in result.into_iter() {
         let ds = lsp_types::PublishDiagnosticsParams::new(k.clone(), v, None);
         context

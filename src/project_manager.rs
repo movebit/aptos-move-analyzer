@@ -239,6 +239,7 @@ impl Project {
             .global_env
             .report_diag(&mut error_writer, Severity::Error);
         new_project.err_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+        log::error!("global_env's err_diags = {:?}", new_project.err_diags);
         Ok(new_project)
     }
 
