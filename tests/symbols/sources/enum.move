@@ -1,4 +1,4 @@
-module Symbols::test_enum {
+module Symbols::TestEnum {
     use std::string::String;
     enum Shape {
         Circle {
@@ -55,17 +55,21 @@ module Symbols::test_enum {
         // simple variant name OK
     }
 
-    fun area(self: &Rectangle): u64 {
+    fun mul_with_pi(rad: u64): u64 {
+        1
+    }
+
+    fun area(self: &Shape): u64 {
         match(self) {
-            Circle { radius } => mul_with_pi(*radius * *radius),
-            Rectangle { width, height } => *width * *height
+            Shape::Circle { radius } => mul_with_pi(*radius * *radius),
+            Shape::Rectangle { width, height } => *width * *height
         }
     }
 
     //  match over a mutable reference
-    fun scale_radius(self: &mut Rectangle, factor: u64) {
+    fun scale_radius(self: &mut Shape, factor: u64) {
         match(self) {
-            Circle { radius: r } => *r = *r * factor,
+            Shape::Circle { radius: r } => *r = *r * factor,
             _ => {}
             // do nothing if not a Circle
         }
@@ -101,7 +105,7 @@ module Symbols::test_enum {
 
     // Using Enums Patterns in Lets
     fun use_enum_in_let() {
-        let data: VersionData;
-        let V1 { name } = data;
+        let data: VersionedData;
+        let VersionedData::V1 { name } = data;
     }
 }

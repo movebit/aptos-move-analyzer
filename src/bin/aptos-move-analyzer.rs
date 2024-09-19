@@ -25,7 +25,7 @@ use lsp_types::{
     TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use move_command_line_common::files::FileHash;
-use move_compiler::{diagnostics::Diagnostics, PASS_TYPING};
+use move_compiler::{diagnostics::Diagnostics, PASS_COMPILATION};
 use move_package::CompilerConfig;
 use std::{
     collections::HashMap,
@@ -337,7 +337,6 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
             return;
         }
     };
-    log::error!("report_diag -------------");
 
     let mut result: HashMap<Url, Vec<lsp_types::Diagnostic>> = HashMap::new();
     let diag_err = proj.err_diags.clone();
@@ -395,7 +394,6 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
         let url = url::Url::from_file_path(PathBuf::from(file_path).as_path()).unwrap();
         result.insert(url, vec![d]);
     }
-    log::error!("result = {:?}", result);
     for (k, v) in result.into_iter() {
         let ds = lsp_types::PublishDiagnosticsParams::new(k.clone(), v, None);
         context
@@ -542,16 +540,20 @@ fn get_package_compile_diagnostics(pkg_path: &Path) -> Result<Diagnostics> {
     let resolution_graph = build_config.resolution_graph_for_package(pkg_path, &mut Vec::new())?;
     let build_plan = BuildPlan::create(resolution_graph)?;
     let mut diagnostics = None;
-    let compile_cfg: move_package::CompilerConfig = Default::default();
+    let compile_cfg = move_package::CompilerConfig {
+        compiler_version: Some(CompilerVersion::V2_1),
+        language_version: Some(LanguageVersion::V2_1),
+        ..Default::default()
+    };
     build_plan.compile_with_driver(
         &mut std::io::sink(),
         &compile_cfg,
         |compiler| {
-            let (_, compilation_result) = compiler.run::<PASS_TYPING>()?;
+            let (_, compilation_result) = compiler.run::<PASS_COMPILATION>()?;
             match compilation_result {
                 std::result::Result::Ok(_) => {}
                 std::result::Result::Err(diags) => {
-                    log::error!("PASS_TYPING get diags");
+                    log::error!("PASS_COMPILATION get diags");
                     diagnostics = Some(diags);
                 }
             };

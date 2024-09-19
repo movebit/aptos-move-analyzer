@@ -972,6 +972,13 @@ impl Handler {
                     self.collect_local_var_in_pattern(pattern);
                     true
                 }
+                Match(_, _, match_arm_vec) => {
+                    for match_arm in match_arm_vec {
+                        self.collect_local_var_in_pattern(&match_arm.pattern);
+                        self.process_pattern(env, &match_arm.pattern);
+                    }
+                    true
+                }
                 _ => {
                     log::trace!("________________");
                     true
@@ -1005,7 +1012,7 @@ impl Handler {
         if let Call(node_id, SpecFunction(mid, fid, _), _) = expdata {
             let this_call_loc = env.get_node_loc(*node_id);
             log::trace!(
-                ">> exp.visit this_call_loc = {:?}",
+                "<SpecFunction> exp.visit this_call_loc = {:?}",
                 env.get_file_and_location(&this_call_loc)
             );
             if this_call_loc.span().start() < self.mouse_span.end()
@@ -1061,11 +1068,10 @@ impl Handler {
     }
 
     fn process_call(&mut self, env: &GlobalEnv, expdata: &move_model::ast::ExpData) {
-        log::trace!(">> process_call");
         if let Call(node_id, MoveFunction(mid, fid), _) = expdata {
             let this_call_loc = env.get_node_loc(*node_id);
-            log::trace!(
-                ">> exp.visit this_call_loc = {:?}",
+            log::info!(
+                "<MoveFunction> exp.visit this_call_loc = {:?}",
                 env.get_location(&this_call_loc)
             );
             if this_call_loc.span().start() < self.mouse_span.end()
@@ -1085,7 +1091,7 @@ impl Handler {
         if let Call(node_id, Select(mid, sid, fid), _) = expdata {
             let this_call_loc = env.get_node_loc(*node_id);
             log::trace!(
-                ">> exp.visit this_call_loc = {:?}",
+                "<Select>> exp.visit this_call_loc = {:?}",
                 env.get_location(&this_call_loc)
             );
             if this_call_loc.span().start() > self.mouse_span.end()
@@ -1120,8 +1126,8 @@ impl Handler {
 
         if let Call(node_id, Pack(mid, sid, _), _) = expdata {
             let this_call_loc = env.get_node_loc(*node_id);
-            log::trace!(
-                ">> exp.visit this_call_loc = {:?}",
+            log::info!(
+                "<Pack> exp.visit this_call_loc = {:?}",
                 env.get_location(&this_call_loc)
             );
             if this_call_loc.span().start() > self.mouse_span.end()
@@ -1135,13 +1141,44 @@ impl Handler {
             self.insert_result(env, &pack_struct_loc, &this_call_loc);
         }
 
-        // builtin fun -- move_model::ast::Operation::{MoveFrom, MoveTo, Exists, Borrow, BorrowGlobal};
-        if let Call(node_id, _, _) = expdata {
+        // builtin fun -- move_model::ast::Operation::{MoveFrom, MoveTo, Exists, Borrow, BorrowGlobal, SelectVariants};
+        if let Call(node_id, operation, _) = expdata {
+            if matches!(
+                operation,
+                Add | Sub
+                    | Mul
+                    | Mod
+                    | Div
+                    | BitOr
+                    | BitAnd
+                    | Xor
+                    | Shl
+                    | Shr
+                    | And
+                    | Or
+                    | Eq
+                    | Neq
+                    | Lt
+                    | Gt
+                    | Le
+                    | Ge
+                    | Not
+                    | Cast
+                    | Deref
+                    | Tuple
+            ) {
+                return;
+            }
             let this_call_loc = env.get_node_loc(*node_id);
             log::info!(
-                ">> exp.visit this_call_loc = {:?}",
+                "<builtin> exp.visit this_call_loc = {:?}",
                 env.get_location(&this_call_loc)
             );
+            log::info!(
+                "<builtin> exp.visit this_call = {:?}",
+                env.get_source(&this_call_loc)
+            );
+            log::info!("<builtin> exp.visit expdata = {:?}", expdata);
             if this_call_loc.span().start() < self.mouse_span.end()
                 && self.mouse_span.end() < this_call_loc.span().end()
             {

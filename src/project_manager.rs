@@ -208,7 +208,7 @@ impl Project {
                 true,
                 &attributes,
                 LanguageVersion::V2_1,
-                true,
+                false,
                 false,
                 true,
                 true,
@@ -239,7 +239,9 @@ impl Project {
             .global_env
             .report_diag(&mut error_writer, Severity::Error);
         new_project.err_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-        log::error!("global_env's err_diags = {:?}", new_project.err_diags);
+        if new_project.err_diags.len() > 0 {
+            log::error!("global_env's err_diags = \n{}", new_project.err_diags);
+        }
         Ok(new_project)
     }
 
