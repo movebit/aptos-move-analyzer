@@ -103,7 +103,7 @@ export async function downloadFromUrl_v2(
       const agent = new HttpsProxyAgent(proxy);
       options.agent = agent;
       options.rejectUnauthorized = false;
-      url = 'https://mirror.ghproxy.com/' + url;
+      // url = 'https://ghp.ci/' + url;
     }
     log.info("Downloading file from " + url);
 
