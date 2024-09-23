@@ -105,32 +105,32 @@ impl Handler {
         }
     }
 
-    // fn check_move_model_loc_contains_mouse_pos(
-    //     &self,
-    //     env: &GlobalEnv,
-    //     loc: &move_model::model::Loc,
-    // ) -> bool {
-    //     if let Some(obj_first_col) = env.get_location(&move_model::model::Loc::new(
-    //         loc.file_id(),
-    //         codespan::Span::new(
-    //             loc.span().start(),
-    //             loc.span().start() + codespan::ByteOffset(1),
-    //         ),
-    //     )) {
-    //         if let Some(obj_last_col) = env.get_location(&move_model::model::Loc::new(
-    //             loc.file_id(),
-    //             codespan::Span::new(loc.span().end(), loc.span().end() + codespan::ByteOffset(1)),
-    //         )) {
-    //             if u32::from(obj_first_col.line) == self.line
-    //                 && u32::from(obj_first_col.column) <= self.col
-    //                 && self.col <= u32::from(obj_last_col.column)
-    //             {
-    //                 return true;
-    //             }
-    //         }
-    //     }
-    //     false
-    // }
+    fn check_move_model_loc_contains_mouse_pos(
+        &self,
+        env: &GlobalEnv,
+        loc: &move_model::model::Loc,
+    ) -> bool {
+        if let Some(obj_first_col) = env.get_location(&move_model::model::Loc::new(
+            loc.file_id(),
+            codespan::Span::new(
+                loc.span().start(),
+                loc.span().start() + codespan::ByteOffset(1),
+            ),
+        )) {
+            if let Some(obj_last_col) = env.get_location(&move_model::model::Loc::new(
+                loc.file_id(),
+                codespan::Span::new(loc.span().end(), loc.span().end() + codespan::ByteOffset(1)),
+            )) {
+                if u32::from(obj_first_col.line) == self.line
+                    && u32::from(obj_first_col.column) <= self.col
+                    && self.col <= u32::from(obj_last_col.column)
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 
     fn convert_loc_to_file_range(
         &mut self,
@@ -228,6 +228,40 @@ impl Handler {
         );
     }
 
+    fn get_mouse_token_span(
+        &mut self,
+        env: &GlobalEnv,
+        capture_loc: &move_model::model::Loc,
+    ) -> (usize, usize) {
+        if let Ok(ty_str) = env.get_source(&capture_loc) {
+            let mut lexer = Lexer::new(ty_str, FileHash::new(ty_str));
+            let mut capture_start_pos = 0;
+            let mut capture_end_pos = 0;
+            if !lexer.advance().is_err() {
+                while lexer.peek() != Tok::EOF {
+                    let token_start_pos =
+                        lexer.start_loc() + usize::from(capture_loc.span().start());
+                    if token_start_pos <= self.mouse_span.end().into()
+                        && usize::from(self.mouse_span.end())
+                            <= token_start_pos + lexer.content().len()
+                    {
+                        capture_start_pos = lexer.start_loc();
+                        capture_end_pos = capture_start_pos + lexer.content().len();
+                        break;
+                    }
+                    if lexer.advance().is_err() {
+                        break;
+                    }
+                }
+            }
+            return (capture_start_pos, capture_end_pos);
+        }
+        (
+            0,
+            (capture_loc.span().end() - capture_loc.span().start()).into(),
+        )
+    }
+
     fn get_which_modules_used_target_module(
         &mut self,
         env: &GlobalEnv,
@@ -247,6 +281,61 @@ impl Handler {
                 None
             })
             .collect()
+    }
+
+    fn process_const(&mut self, env: &GlobalEnv) -> bool {
+        let target_module = env.get_module(self.target_module_id);
+        self.get_mouse_loc(env, &target_module.get_loc());
+        let (offset_spos, offset_epos) = self.get_mouse_token_span(env, &target_module.get_loc());
+        let capture_loc = move_model::model::Loc::new(
+            target_module.get_loc().file_id(),
+            codespan::Span::new(
+                target_module.get_loc().span().start() + codespan::ByteOffset(offset_spos as i64),
+                target_module.get_loc().span().start() + codespan::ByteOffset(offset_epos as i64),
+            ),
+        );
+        let mut value_str = String::default();
+        if let Ok(capture_value_str) = env.get_source(&capture_loc) {
+            value_str = capture_value_str.to_string();
+        }
+        log::info!("value_str = {}", value_str);
+        let mut result_candidates: Vec<FileRange> = Vec::new();
+        for const_value in target_module.get_named_constants() {
+            let spool = env.symbol_pool();
+            let const_str = const_value.get_name().display(spool).to_string();
+            if value_str != const_str {
+                continue;
+            }
+            log::info!("const_str = {}", const_str);
+            for each_module_ev in env.get_modules() {
+                for fun_ev_in_each_mod in each_module_ev.get_functions() {
+                    if let Some(exp) = fun_ev_in_each_mod.get_def().as_deref() {
+                        exp.visit_pre_order(&mut |e| {
+                            if let Value(node_id, _) = e {
+                                let const_loc = env.get_node_loc(*node_id);
+                                let mut other_value_str = String::default();
+                                if let Ok(val_str) = env.get_source(&const_loc) {
+                                    other_value_str = val_str.to_string();
+                                }
+                                log::info!("other_value_str = {}", other_value_str);
+                                if other_value_str == value_str {
+                                    result_candidates
+                                        .push(self.convert_loc_to_file_range(env, &const_loc));
+                                }
+                            }
+                            true
+                        });
+                    }
+                }
+            }
+        }
+
+        if !result_candidates.is_empty() {
+            self.result_ref_candidates.push(result_candidates);
+            self.capture_items_span.push(capture_loc.span());
+            return true;
+        }
+        false
     }
 
     fn process_func(&mut self, env: &GlobalEnv) {
@@ -314,7 +403,6 @@ impl Handler {
                 if let Some(exp) = calling_fn_env.get_def().as_deref() {
                     let fun_body_loc = env.get_node_loc(exp.node_id());
                     let fun_body_source = env.get_source(&fun_body_loc);
-                    log::info!("fun_body_source = {:?}", fun_body_source);
                     if let Ok(fun_body_str) = fun_body_source {
                         let v: Vec<_> = fun_body_str.match_indices(&target_fn_str).collect();
                         for (idx, _) in v {
@@ -341,7 +429,7 @@ impl Handler {
 
     fn process_parameter(&mut self, env: &GlobalEnv, target_fun: &FunctionEnv) {
         let fun_paras = target_fun.get_parameters();
-        log::info!("process_parameter >> fun_paras: {:?}", fun_paras);
+        log::trace!("process_parameter >> fun_paras: {:?}", fun_paras);
         let mut correct_para_idx = 0;
         let mut whose_end_pos_cloest_mouse = 10000;
         for (para_idx, para) in fun_paras.iter().enumerate() {
@@ -420,7 +508,6 @@ impl Handler {
         let specifier_vec = target_fun.get_access_specifiers();
         let require_vec = target_fun.get_acquires_global_resources();
         let fn_source = env.get_source(&target_fun.get_loc());
-        log::info!("fn_source = {:?}", fn_source);
         if let Ok(fn_str) = fn_source {
             let mut r_paren_vec = vec![];
             let mut l_brace_vec = vec![];
@@ -677,6 +764,43 @@ impl Handler {
     fn process_expr(&mut self, env: &GlobalEnv, exp: &move_model::ast::Exp) {
         log::trace!("process_expr -------------------------\n");
         exp.visit_pre_order(&mut |e| match e {
+            // Value(node_id, _) => {
+            //     // Const variable
+            //     let value_loc = env.get_node_loc(*node_id);
+            //     if self.check_move_model_loc_contains_mouse_pos(env, &value_loc) {
+            //         let mut value_str = String::default();
+            //         if let Ok(capture_value_str) = env.get_source(&value_loc) {
+            //             value_str = capture_value_str.to_string();
+            //         }
+            //         log::info!(
+            //             "value_str = {}",
+            //             value_str
+            //         );
+            //         let mut result_candidates: Vec<FileRange> = Vec::new();
+            //         for each_module_ev in env.get_modules() {
+            //             for named_const in
+            //                 each_module_ev.get_named_constants()
+            //             {
+            //                 let spool = env.symbol_pool();
+            //                 let named_const_str = named_const.get_name().display(spool).to_string();
+            //                 if value_str.contains(&named_const_str) {
+            //                     log::info!(
+            //                         "insert_result named_const.get_name() = {}",
+            //                         named_const_str
+            //                     );
+
+            //                     result_candidates.push(self.convert_loc_to_file_range(env, &named_const.get_loc()));
+            //                 }
+            //             }
+            //         }
+            //         if !result_candidates.is_empty() {
+            //             self.result_ref_candidates.push(result_candidates);
+            //             self.capture_items_span.push(value_loc.span());
+            //             return true;
+            //         }
+            //     }
+            //     true
+            // }
             Call(_, _, _) => {
                 self.process_call(env, e);
                 true
@@ -1074,6 +1198,9 @@ impl Handler {
                     self.process_spec_func(env);
                     self.process_spec_struct(env);
                 } else {
+                    if self.process_const(env) {
+                        return;
+                    }
                     self.process_func(env);
                     self.process_struct(env);
                 }
