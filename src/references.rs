@@ -105,33 +105,6 @@ impl Handler {
         }
     }
 
-    fn check_move_model_loc_contains_mouse_pos(
-        &self,
-        env: &GlobalEnv,
-        loc: &move_model::model::Loc,
-    ) -> bool {
-        if let Some(obj_first_col) = env.get_location(&move_model::model::Loc::new(
-            loc.file_id(),
-            codespan::Span::new(
-                loc.span().start(),
-                loc.span().start() + codespan::ByteOffset(1),
-            ),
-        )) {
-            if let Some(obj_last_col) = env.get_location(&move_model::model::Loc::new(
-                loc.file_id(),
-                codespan::Span::new(loc.span().end(), loc.span().end() + codespan::ByteOffset(1)),
-            )) {
-                if u32::from(obj_first_col.line) == self.line
-                    && u32::from(obj_first_col.column) <= self.col
-                    && self.col <= u32::from(obj_last_col.column)
-                {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
     fn convert_loc_to_file_range(
         &mut self,
         env: &GlobalEnv,
@@ -338,7 +311,7 @@ impl Handler {
         false
     }
 
-    fn process_func(&mut self, env: &GlobalEnv) {
+    fn process_func(&mut self, env: &GlobalEnv) -> bool {
         let mut found_target_fun = false;
         let mut target_fun_id = FunId::new(env.symbol_pool().make("name"));
         let target_module = env.get_module(self.target_module_id);
@@ -360,7 +333,7 @@ impl Handler {
 
         if !found_target_fun {
             log::info!("<on_references> -- not in fun!\n");
-            return;
+            return false;
         }
 
         let target_module = env.get_module(self.target_module_id);
@@ -378,6 +351,7 @@ impl Handler {
                 self.process_expr(env, exp);
             }
         };
+        !self.capture_items_span.is_empty()
     }
 
     fn process_fn_name(
@@ -637,7 +611,7 @@ impl Handler {
         }
     }
 
-    fn process_struct(&mut self, env: &GlobalEnv) {
+    fn process_struct(&mut self, env: &GlobalEnv) -> bool {
         let mut found_target_struct = false;
         let mut target_struct_id = StructId::new(env.symbol_pool().make("name"));
         let target_module = env.get_module(self.target_module_id);
@@ -659,7 +633,7 @@ impl Handler {
 
         if !found_target_struct {
             log::info!("<on_references> -- not in struct!\n");
-            return;
+            return false;
         }
 
         let target_module = env.get_module(self.target_module_id);
@@ -706,6 +680,7 @@ impl Handler {
                 }
             }
         }
+        !self.capture_items_span.is_empty()
     }
 
     fn process_spec_struct(&mut self, env: &GlobalEnv) {
@@ -764,43 +739,6 @@ impl Handler {
     fn process_expr(&mut self, env: &GlobalEnv, exp: &move_model::ast::Exp) {
         log::trace!("process_expr -------------------------\n");
         exp.visit_pre_order(&mut |e| match e {
-            // Value(node_id, _) => {
-            //     // Const variable
-            //     let value_loc = env.get_node_loc(*node_id);
-            //     if self.check_move_model_loc_contains_mouse_pos(env, &value_loc) {
-            //         let mut value_str = String::default();
-            //         if let Ok(capture_value_str) = env.get_source(&value_loc) {
-            //             value_str = capture_value_str.to_string();
-            //         }
-            //         log::info!(
-            //             "value_str = {}",
-            //             value_str
-            //         );
-            //         let mut result_candidates: Vec<FileRange> = Vec::new();
-            //         for each_module_ev in env.get_modules() {
-            //             for named_const in
-            //                 each_module_ev.get_named_constants()
-            //             {
-            //                 let spool = env.symbol_pool();
-            //                 let named_const_str = named_const.get_name().display(spool).to_string();
-            //                 if value_str.contains(&named_const_str) {
-            //                     log::info!(
-            //                         "insert_result named_const.get_name() = {}",
-            //                         named_const_str
-            //                     );
-
-            //                     result_candidates.push(self.convert_loc_to_file_range(env, &named_const.get_loc()));
-            //                 }
-            //             }
-            //         }
-            //         if !result_candidates.is_empty() {
-            //             self.result_ref_candidates.push(result_candidates);
-            //             self.capture_items_span.push(value_loc.span());
-            //             return true;
-            //         }
-            //     }
-            //     true
-            // }
             Call(_, _, _) => {
                 self.process_call(env, e);
                 true
@@ -837,8 +775,6 @@ impl Handler {
                 if para_string != source_string {
                     continue;
                 }
-                // let para_loc = para.2;
-                // self.insert_result(env, &para_loc, &source_loc)
             }
         }
     }
@@ -1018,7 +954,6 @@ impl Handler {
                 if let Some(sym_pattern_node_id) = self.symbol_2_pattern_id.get(sym) {
                     let pattern_loc = env.get_node_loc(*sym_pattern_node_id);
                     log::info!("Var pattern_loc = {:?}", pattern_loc);
-                    // self.insert_result(env, &pattern_loc, &this_call_loc)
                 } else {
                     self.process_temporary_for_function_para(env, &this_call_loc);
                 }
@@ -1201,8 +1136,12 @@ impl Handler {
                     if self.process_const(env) {
                         return;
                     }
-                    self.process_func(env);
-                    self.process_struct(env);
+                    if self.process_func(env) {
+                        return;
+                    }
+                    if self.process_struct(env) {
+                        return;
+                    }
                 }
             }
         }
