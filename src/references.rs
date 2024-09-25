@@ -7,18 +7,12 @@ use crate::{
     utils::{path_concat, FileRange},
 };
 use codespan::{ByteIndex, ByteOffset};
+use itertools::Itertools;
 use lsp_server::*;
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
 use move_compiler::parser::lexer::{Lexer, Tok};
-// use move_model::{
-//     ast::{ExpData::*, Operation::*, SpecBlockTarget},
-//     model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, ModuleId, StructId},
-// };
-// use codespan::ByteIndex;
-// use codespan::ByteOffset;
-use itertools::Itertools;
-// use move_ir_types::location::*;
+
 use move_model::{
     ast::{ExpData::*, Operation::*, Pattern as MoveModelPattern, SpecBlockTarget},
     model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, ModuleId, NodeId, StructId},
@@ -185,15 +179,6 @@ impl Handler {
             );
             mouse_loc = env.get_location(&mouse_line_last_col).unwrap();
         }
-
-        let mouse_source = env.get_source(&move_model::model::Loc::new(
-            target_fn_or_struct_loc.file_id(),
-            codespan::Span::new(
-                mouse_line_first_col.span().start(),
-                mouse_line_last_col.span().start(),
-            ),
-        ));
-        log::info!("<on_references> -- mouse_source = {:?}", mouse_source);
 
         self.mouse_span = codespan::Span::new(
             mouse_line_first_col.span().start(),
@@ -753,6 +738,13 @@ impl Handler {
                 self.collect_local_var_in_pattern(pattern);
                 true
             }
+            Match(_, _, match_arm_vec) => {
+                for match_arm in match_arm_vec {
+                    self.collect_local_var_in_pattern(&match_arm.pattern);
+                    self.process_pattern(env, &match_arm.pattern);
+                }
+                true
+            }
             _ => {
                 log::trace!("________________");
                 true
@@ -848,6 +840,33 @@ impl Handler {
             }
         }
 
+        if let Call(node_id, SelectVariants(mid, sid, fid_vec), _) = expdata {
+            let this_call_loc = env.get_node_loc(*node_id);
+            log::info!(
+                ">> exp.visit this_call_loc = {:?}",
+                env.get_location(&this_call_loc)
+            );
+            if this_call_loc.span().start() > self.mouse_span.end()
+                || self.mouse_span.end() > this_call_loc.span().end()
+            {
+                return;
+            }
+            let mut result_candidates: Vec<FileRange> = Vec::new();
+            let called_module = env.get_module(*mid);
+            let called_struct = called_module.get_struct(*sid);
+            for fid in fid_vec {
+                let called_field = called_struct.get_field(*fid);
+                let field_name = called_field.get_name();
+                result_candidates.append(
+                    &mut self.find_field_used_of_module(&called_struct.module_env, field_name),
+                );
+            }
+            if !result_candidates.is_empty() {
+                self.result_ref_candidates.push(result_candidates);
+                self.capture_items_span.push(this_call_loc.span());
+            }
+        }
+
         if let Call(node_id, Pack(mid, sid, _), args) = expdata {
             let this_call_loc = env.get_node_loc(*node_id);
             log::trace!(
@@ -883,7 +902,7 @@ impl Handler {
             }
 
             if let Ok(pack_struct_str) = env.get_source(&this_call_loc) {
-                log::info!("pack_struct_str = {:?}", pack_struct_str);
+                log::info!("<refrences><process_call> pack_struct_str = {:?}", pack_struct_str);
                 for arg in args {
                     for node_id in arg.node_ids() {
                         log::info!("arg = {:?}", env.get_source(&env.get_node_loc(node_id)));
@@ -930,6 +949,21 @@ impl Handler {
                     if !result_candidates.is_empty() {
                         self.result_ref_candidates.push(result_candidates);
                         self.capture_items_span.push(this_call_loc.span());
+                    }
+                } else if called_struct.has_variants() {
+                    // let color = Color::Blue;  // this is pack operation
+                    for enum_field in called_struct.get_variants() {
+                        let spool = env.symbol_pool();
+                        let filed_str = enum_field.display(spool).to_string();
+                        if pack_struct_str.ends_with(&filed_str) {
+                            log::info!("filed_str = {}", filed_str);
+                            let result_candidates =
+                                self.find_field_used_of_module(&called_module, enum_field);
+                            if !result_candidates.is_empty() {
+                                self.result_ref_candidates.push(result_candidates);
+                                self.capture_items_span.push(this_call_loc.span());
+                            }
+                        }
                     }
                 }
             }
@@ -1182,6 +1216,19 @@ impl Handler {
                                 ));
                             }
                         }
+                        Call(node_id, SelectVariants(mid, sid, fid_vec), _) => {
+                            let called_module = mod_env.env.get_module(*mid);
+                            let called_struct = called_module.get_struct(*sid);
+                            for fid in fid_vec {
+                                let called_field = called_struct.get_field(*fid);
+                                if field_name == called_field.get_name() {
+                                    result_candidates.push(self.convert_loc_to_file_range(
+                                        mod_env.env,
+                                        &mod_env.env.get_node_loc(*node_id),
+                                    ));
+                                }
+                            }
+                        }
                         _ => {}
                     }
                     true
@@ -1244,6 +1291,18 @@ impl Handler {
                                         self.convert_loc_to_file_range(mod_env.env, &result_loc),
                                     );
                                     break;
+                                }
+                            }
+
+                            if called_struct.has_variants() {
+                                // let color = Color::Blue;  // this is pack operation
+                                for enum_field in called_struct.get_variants() {
+                                    if field_name == enum_field {
+                                        result_candidates.push(
+                                            self.convert_loc_to_file_range(mod_env.env, &result_loc),
+                                        );
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -1319,6 +1378,18 @@ impl Handler {
                                             ),
                                         );
                                         break;
+                                    }
+                                }
+
+                                if pattern_struct.has_variants() {
+                                    // let color = Color::Blue;  // this is pack operation
+                                    for enum_field in pattern_struct.get_variants() {
+                                        if field_name == enum_field {
+                                            result_candidates.push(
+                                                self.convert_loc_to_file_range(mod_env.env, &result_loc),
+                                            );
+                                            break;
+                                        }
                                     }
                                 }
                             }
