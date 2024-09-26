@@ -5,10 +5,14 @@ use super::utils::*;
 use crate::{analyzer_handler::*, project::Project};
 use anyhow::{Ok, Result};
 use codespan_reporting::diagnostic::Severity;
+use codespan_reporting::term::termcolor::Buffer;
 use move_compiler::shared::{NumericalAddress, PackagePaths};
 use move_core_types::account_address::*;
+use move_model::metadata::CompilerVersion;
 use move_model::metadata::LanguageVersion;
+use move_model::model::GlobalEnv;
 use move_model::PackageInfo;
+use move_package::compilation::build_plan::BuildPlan;
 use move_package::source_package::{layout::SourcePackageLayout, manifest_parser::*};
 use num_bigint::BigUint;
 use std::{
@@ -107,54 +111,37 @@ impl Project {
         self.manifest_not_exists.is_empty() && self.manifest_load_failures.is_empty()
     }
 
-    pub fn new(
-        root_dir: impl Into<PathBuf>,
+    fn get_global_env_by_move_package_v1(
+        &mut self,
         report_err: impl FnMut(String) + Clone,
-    ) -> Result<Self> {
-        let working_dir = root_dir.into();
-        log::info!("scan modules at {:?}", &working_dir);
-        let mut new_project = Self {
-            modules: Default::default(),
-            manifests: Default::default(),
-            hash_file: Rc::new(RefCell::new(PathBufHashMap::new())),
-            file_line_mapping: Rc::new(RefCell::new(FileLineMapping::new())),
-            manifest_paths: Default::default(),
-            manifest_not_exists: Default::default(),
-            manifest_load_failures: Default::default(),
-            manifest_mod_time: Default::default(),
-            global_env: Default::default(),
-            current_modifing_file_content: Default::default(),
-            targets: vec![],
-            dependents: vec![],
-            addrname_2_addrnum: Default::default(),
-            err_diags: String::default(),
-        };
-
+        pkg_path: &Path,
+    ) {
         let mut targets_paths: Vec<PathBuf> = Vec::new();
         let mut dependents_paths: Vec<PathBuf> = Vec::new();
-        new_project.load_project(
-            &working_dir,
+        self.load_project(
+            &pkg_path,
             report_err,
             true,
             &mut targets_paths,
             &mut dependents_paths,
-        )?;
+        )
+        .unwrap_or_default();
         log::info!("targets_paths.len() = {:?}", targets_paths.len());
         log::info!("dependents_paths.len() = {:?}", dependents_paths.len());
-
         let build_config = move_package::BuildConfig {
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
             skip_fetch_latest_git_deps: true,
             ..Default::default()
         };
-        let resolution_graph =
-            build_config.resolution_graph_for_package(&working_dir, &mut Vec::new())?;
+        let resolution_graph = build_config
+            .resolution_graph_for_package(&pkg_path, &mut Vec::new())
+            .unwrap();
         let named_address_mapping: Vec<_> = resolution_graph
             .extract_named_address_mapping()
             .map(|(name, addr)| format!("{}={}", name.as_str(), addr))
             .collect();
-        let addrs = parse_addresses_from_options(named_address_mapping.clone())?;
+        let addrs = parse_addresses_from_options(named_address_mapping.clone()).unwrap_or_default();
 
         let targets = vec![PackagePaths {
             name: None,
@@ -177,14 +164,12 @@ impl Project {
         }];
 
         let attributes: BTreeSet<String> = Default::default();
-        new_project.targets = targets.clone();
-        new_project.dependents = dependents.clone();
-
+        self.targets = targets.clone();
+        self.dependents = dependents.clone();
         {
-            // info!("Type Checking");
-            // Run the model builder, which performs context checking.
-            let addrs = move_model::parse_addresses_from_options(named_address_mapping.clone())?;
-            new_project.global_env = move_model::run_model_builder_in_compiler_mode(
+            let addrs = move_model::parse_addresses_from_options(named_address_mapping.clone())
+                .unwrap_or_default();
+            self.global_env = move_model::run_model_builder_in_compiler_mode(
                 PackageInfo {
                     sources: targets_paths
                         .clone()
@@ -212,7 +197,8 @@ impl Project {
                 false,
                 true,
                 true,
-            )?;
+            )
+            .unwrap_or_default();
 
             // // Store address aliases
             // let map = addrs
@@ -224,9 +210,8 @@ impl Project {
 
         log::info!(
             "env.get_module_count() = {:?}",
-            &new_project.global_env.get_module_count()
+            &self.global_env.get_module_count()
         );
-        use codespan_reporting::term::termcolor::Buffer;
         let mut error_writer = Buffer::no_color();
 
         let mut helper = HashMap::new();
@@ -234,13 +219,300 @@ impl Project {
             helper.insert(addr_name.clone(), addr_num.to_string());
         }
 
-        new_project.addrname_2_addrnum = helper;
+        self.addrname_2_addrnum = helper;
+        self.global_env
+            .report_diag(&mut error_writer, Severity::Error);
+        self.err_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+        if self.err_diags.len() > 0 {
+            log::error!("global_env's err_diags = \n{}", self.err_diags);
+        }
+    }
+
+    fn get_global_env_by_move_package_v2(&mut self, pkg_path: &Path) -> Result<GlobalEnv> {
+        let build_config = move_package::BuildConfig {
+            test_mode: true,
+            install_dir: Some(tempdir().unwrap().path().to_path_buf()),
+            skip_fetch_latest_git_deps: true,
+            compiler_config: move_package::CompilerConfig {
+                compiler_version: Some(CompilerVersion::V2_1),
+                language_version: Some(LanguageVersion::V2_1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let resolution_graph =
+            build_config.resolution_graph_for_package(pkg_path, &mut Vec::new())?;
+        let build_plan = BuildPlan::create(resolution_graph)?;
+        let compile_cfg = move_package::CompilerConfig {
+            compiler_version: Some(CompilerVersion::V2_1),
+            language_version: Some(LanguageVersion::V2_1),
+            ..Default::default()
+        };
+        let (_, env) = build_plan.compile_with_driver(
+            &mut std::io::sink(),
+            &compile_cfg,
+            |_compiler| Ok(Default::default()),
+            |compile_option| {
+                let addrs = move_model::parse_addresses_from_options(
+                    compile_option.named_address_mapping.clone(),
+                )?;
+                // log::info!("\n*******************************************\n\n addrs = \n{:?}", addrs);
+                // log::info!("\n*******************************************\n\n sources = \n{:?}", compile_option.sources);
+                // log::info!(
+                //     "\n*******************************************\n\n sources = \n{:?}",
+                //     compile_option.sources_deps
+                // );
+                let mut src_dep_paths = vec![];
+                let mut dep_paths = vec![];
+                for dep_path in &compile_option.sources_deps {
+                    if dep_path.split('/').find(|&x| x == "tests").is_some() {
+                        log::info!(
+                            "\n*******************************************\n\n 00 src_dep_path = \n{:?}",
+                            dep_path
+                        );
+                        continue;
+                    }
+                    if dep_path.split('\\').find(|&x| x == "tests").is_some() {
+                        log::info!(
+                            "\n*******************************************\n\n 11 src_dep_path = \n{:?}",
+                            dep_path
+                        );
+                        continue;
+                    }
+                    if dep_path.contains("/tests/")
+                        || dep_path.contains("/tests\\")
+                        || dep_path.contains(r"/tests\\")
+                        || dep_path.contains(r"\\tests\\")
+                    {
+                        log::info!(
+                            "\n*******************************************\n\n 22 src_dep_path = \n{:?}",
+                            dep_path
+                        );
+                        continue;
+                    }
+                    src_dep_paths.push(dep_path.clone());
+                }
+                for dep_path in &compile_option.dependencies {
+                    if dep_path.split('/').find(|&x| x == "tests").is_some() {
+                        log::info!(
+                            "\n*******************************************\n\n 33 dep_path = \n{:?}",
+                            dep_path
+                        );
+                        continue;
+                    }
+                    if dep_path.split('\\').find(|&x| x == "tests").is_some() {
+                        log::info!(
+                            "\n*******************************************\n\n 44 dep_path = \n{:?}",
+                            dep_path
+                        );
+                        continue;
+                    }
+                    if dep_path.contains("/tests/")
+                        || dep_path.contains("/tests\\")
+                        || dep_path.contains(r"/tests\\")
+                        || dep_path.contains(r"\\tests\\")
+                    {
+                        log::info!(
+                            "\n*******************************************\n\n 55 dep_path = \n{:?}",
+                            dep_path
+                        );
+                        continue;
+                    }
+                    dep_paths.push(dep_path.clone());
+                }
+                let mut helper = HashMap::new();
+                for (addr_name, addr_num) in addrs.iter() {
+                    helper.insert(addr_name.clone(), addr_num.to_string());
+                }
+                self.addrname_2_addrnum = helper;
+                let env = move_model::run_model_builder_in_compiler_mode(
+                    PackageInfo {
+                        sources: compile_option.sources,
+                        address_map: addrs.clone(),
+                    },
+                    PackageInfo {
+                        sources: src_dep_paths,
+                        address_map: addrs.clone(),
+                    },
+                    vec![PackageInfo {
+                        sources: dep_paths,
+                        address_map: addrs.clone(),
+                    }],
+                    true,
+                    &Default::default(),
+                    LanguageVersion::V2_1,
+                    false,
+                    false,
+                    true,
+                    true,
+                )?;
+                self.global_env = env;
+                log::info!(
+                    "self.global_env.get_module_count() = {:?}",
+                    self.global_env.get_module_count()
+                );
+                let mut error_writer2 = Buffer::no_color();
+                self.global_env
+                    .report_diag(&mut error_writer2, Severity::Error);
+                let err_diags = String::from_utf8_lossy(&error_writer2.into_inner()).to_string();
+                if err_diags.len() > 0 {
+                    log::error!(
+                        "\n*******************************************\n\nerr_diags = \n{}",
+                        err_diags
+                    );
+                }
+
+                Ok(Default::default())
+            },
+        )?;
+        Ok(env.unwrap_or_default())
+    }
+
+    pub fn new(
+        root_dir: impl Into<PathBuf>,
+        report_err: impl FnMut(String) + Clone,
+    ) -> Result<Self> {
+        let working_dir = root_dir.into();
+        log::info!("scan modules at {:?}", &working_dir);
+        let mut new_project = Self {
+            modules: Default::default(),
+            manifests: Default::default(),
+            hash_file: Rc::new(RefCell::new(PathBufHashMap::new())),
+            file_line_mapping: Rc::new(RefCell::new(FileLineMapping::new())),
+            manifest_paths: Default::default(),
+            manifest_not_exists: Default::default(),
+            manifest_load_failures: Default::default(),
+            manifest_mod_time: Default::default(),
+            global_env: Default::default(),
+            current_modifing_file_content: Default::default(),
+            targets: vec![],
+            dependents: vec![],
+            addrname_2_addrnum: Default::default(),
+            err_diags: String::default(),
+        };
+        let mut targets_paths: Vec<PathBuf> = Vec::new();
+        let mut dependents_paths: Vec<PathBuf> = Vec::new();
+        new_project.load_project(
+            &working_dir,
+            report_err,
+            true,
+            &mut targets_paths,
+            &mut dependents_paths,
+        )?;
+        // new_project.get_global_env_by_move_package_v1(report_err, &working_dir);
+        // new_project.get_global_env_by_move_package_v2(&working_dir)?;
+        let build_config = move_package::BuildConfig {
+            test_mode: true,
+            install_dir: Some(tempdir().unwrap().path().to_path_buf()),
+            skip_fetch_latest_git_deps: true,
+            compiler_config: move_package::CompilerConfig {
+                compiler_version: Some(CompilerVersion::V2_1),
+                language_version: Some(LanguageVersion::V2_1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let resolution_graph =
+            build_config.resolution_graph_for_package(&working_dir, &mut Vec::new())?;
+        let build_plan = BuildPlan::create(resolution_graph)?;
+        let compile_cfg = move_package::CompilerConfig {
+            compiler_version: Some(CompilerVersion::V2_1),
+            language_version: Some(LanguageVersion::V2_1),
+            ..Default::default()
+        };
+        let _ = build_plan.compile_with_driver(
+            &mut std::io::sink(),
+            &compile_cfg,
+            |_compiler| Ok(Default::default()),
+            |compile_option| {
+                let addrs = move_model::parse_addresses_from_options(
+                    compile_option.named_address_mapping.clone(),
+                )?;
+                // log::info!("\n*******************************************\n\n addrs = \n{:?}", addrs);
+                // log::info!("\n*******************************************\n\n sources = \n{:?}", compile_option.sources);
+                // log::info!(
+                //     "\n*******************************************\n\n sources = \n{:?}",
+                //     compile_option.sources_deps
+                // );
+                let mut src_dep_paths = vec![];
+                let mut dep_paths = vec![];
+                for dep_path in &compile_option.sources_deps {
+                    if dep_path.split('/').find(|&x| x == "tests").is_some() {
+                        continue;
+                    }
+                    if dep_path.split('\\').find(|&x| x == "tests").is_some() {
+                        continue;
+                    }
+                    if dep_path.contains("/tests/")
+                        || dep_path.contains("/tests\\")
+                        || dep_path.contains(r"/tests\\")
+                        || dep_path.contains(r"\\tests\\")
+                    {
+                        continue;
+                    }
+                    src_dep_paths.push(dep_path.clone());
+                }
+                for dep_path in &compile_option.dependencies {
+                    if dep_path.split('/').find(|&x| x == "tests").is_some() {
+                        continue;
+                    }
+                    if dep_path.split('\\').find(|&x| x == "tests").is_some() {
+                        continue;
+                    }
+                    if dep_path.contains("/tests/")
+                        || dep_path.contains("/tests\\")
+                        || dep_path.contains(r"/tests\\")
+                        || dep_path.contains(r"\\tests\\")
+                    {
+                        continue;
+                    }
+                    dep_paths.push(dep_path.clone());
+                }
+                let mut helper = HashMap::new();
+                for (addr_name, addr_num) in addrs.iter() {
+                    helper.insert(addr_name.clone(), addr_num.to_string());
+                }
+                new_project.addrname_2_addrnum = helper;
+                new_project.global_env = move_model::run_model_builder_in_compiler_mode(
+                    PackageInfo {
+                        sources: compile_option.sources,
+                        address_map: addrs.clone(),
+                    },
+                    PackageInfo {
+                        sources: src_dep_paths,
+                        address_map: addrs.clone(),
+                    },
+                    vec![PackageInfo {
+                        sources: dep_paths,
+                        address_map: addrs.clone(),
+                    }],
+                    true,
+                    &Default::default(),
+                    LanguageVersion::V2_1,
+                    false,
+                    false,
+                    true,
+                    true,
+                )?;
+                Ok(Default::default())
+            },
+        )?;
+
+        log::info!(
+            "new_project.global_env.get_module_count() = {:?}",
+            new_project.global_env.get_module_count()
+        );
+        let mut error_writer = Buffer::no_color();
         new_project
             .global_env
             .report_diag(&mut error_writer, Severity::Error);
-        new_project.err_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-        if new_project.err_diags.len() > 0 {
-            log::error!("global_env's err_diags = \n{}", new_project.err_diags);
+        let err_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+        if err_diags.len() > 0 {
+            log::error!(
+                "\n*******************************************\n\nerr_diags = \n{}",
+                err_diags
+            );
+            log::error!("\n*******************************************\n");
         }
         Ok(new_project)
     }
@@ -272,7 +544,6 @@ impl Project {
             "env.get_module_count() = {:?}",
             &self.global_env.get_module_count()
         );
-        use codespan_reporting::term::termcolor::Buffer;
         let mut error_writer = Buffer::no_color();
         self.global_env
             .report_diag(&mut error_writer, Severity::Error);
@@ -312,9 +583,18 @@ impl Project {
             targets_paths.extend(source_paths2);
             targets_paths.extend(source_paths3);
         } else {
-            dependents_paths.extend(source_paths1);
-            dependents_paths.extend(source_paths2);
-            dependents_paths.extend(source_paths3);
+            let mut existing_file_names: std::collections::HashSet<_> = dependents_paths
+                .iter()
+                .filter_map(|path| path.file_name().map(|name| name.to_os_string()))
+                .collect();
+            for path in source_paths1 {
+                if let Some(file_name) = path.file_name().map(|name| name.to_os_string()) {
+                    if !existing_file_names.contains(&file_name) {
+                        existing_file_names.insert(file_name);
+                        dependents_paths.push(path);
+                    }
+                }
+            }
         }
 
         if !manifest_path.exists() {
