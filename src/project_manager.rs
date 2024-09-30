@@ -266,17 +266,9 @@ impl Project {
                 let mut dep_paths = vec![];
                 for dep_path in &compile_option.sources_deps {
                     if dep_path.split('/').find(|&x| x == "tests").is_some() {
-                        log::info!(
-                            "\n*******************************************\n\n 00 src_dep_path = \n{:?}",
-                            dep_path
-                        );
                         continue;
                     }
                     if dep_path.split('\\').find(|&x| x == "tests").is_some() {
-                        log::info!(
-                            "\n*******************************************\n\n 11 src_dep_path = \n{:?}",
-                            dep_path
-                        );
                         continue;
                     }
                     if dep_path.contains("/tests/")
@@ -284,27 +276,15 @@ impl Project {
                         || dep_path.contains(r"/tests\\")
                         || dep_path.contains(r"\\tests\\")
                     {
-                        log::info!(
-                            "\n*******************************************\n\n 22 src_dep_path = \n{:?}",
-                            dep_path
-                        );
                         continue;
                     }
                     src_dep_paths.push(dep_path.clone());
                 }
                 for dep_path in &compile_option.dependencies {
                     if dep_path.split('/').find(|&x| x == "tests").is_some() {
-                        log::info!(
-                            "\n*******************************************\n\n 33 dep_path = \n{:?}",
-                            dep_path
-                        );
                         continue;
                     }
                     if dep_path.split('\\').find(|&x| x == "tests").is_some() {
-                        log::info!(
-                            "\n*******************************************\n\n 44 dep_path = \n{:?}",
-                            dep_path
-                        );
                         continue;
                     }
                     if dep_path.contains("/tests/")
@@ -312,10 +292,6 @@ impl Project {
                         || dep_path.contains(r"/tests\\")
                         || dep_path.contains(r"\\tests\\")
                     {
-                        log::info!(
-                            "\n*******************************************\n\n 55 dep_path = \n{:?}",
-                            dep_path
-                        );
                         continue;
                     }
                     dep_paths.push(dep_path.clone());
@@ -351,17 +327,6 @@ impl Project {
                     "self.global_env.get_module_count() = {:?}",
                     self.global_env.get_module_count()
                 );
-                let mut error_writer2 = Buffer::no_color();
-                self.global_env
-                    .report_diag(&mut error_writer2, Severity::Error);
-                let err_diags = String::from_utf8_lossy(&error_writer2.into_inner()).to_string();
-                if err_diags.len() > 0 {
-                    log::error!(
-                        "\n*******************************************\n\nerr_diags = \n{}",
-                        err_diags
-                    );
-                }
-
                 Ok(Default::default())
             },
         )?;
@@ -400,104 +365,7 @@ impl Project {
             &mut dependents_paths,
         )?;
         // new_project.get_global_env_by_move_package_v1(report_err, &working_dir);
-        // new_project.get_global_env_by_move_package_v2(&working_dir)?;
-        let build_config = move_package::BuildConfig {
-            test_mode: true,
-            install_dir: Some(tempdir().unwrap().path().to_path_buf()),
-            skip_fetch_latest_git_deps: true,
-            compiler_config: move_package::CompilerConfig {
-                compiler_version: Some(CompilerVersion::V2_1),
-                language_version: Some(LanguageVersion::V2_1),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let resolution_graph =
-            build_config.resolution_graph_for_package(&working_dir, &mut Vec::new())?;
-        let build_plan = BuildPlan::create(resolution_graph)?;
-        let compile_cfg = move_package::CompilerConfig {
-            compiler_version: Some(CompilerVersion::V2_1),
-            language_version: Some(LanguageVersion::V2_1),
-            ..Default::default()
-        };
-        let _ = build_plan.compile_with_driver(
-            &mut std::io::sink(),
-            &compile_cfg,
-            |_compiler| Ok(Default::default()),
-            |compile_option| {
-                let addrs = move_model::parse_addresses_from_options(
-                    compile_option.named_address_mapping.clone(),
-                )?;
-                // log::info!("\n*******************************************\n\n addrs = \n{:?}", addrs);
-                // log::info!("\n*******************************************\n\n sources = \n{:?}", compile_option.sources);
-                // log::info!(
-                //     "\n*******************************************\n\n sources = \n{:?}",
-                //     compile_option.sources_deps
-                // );
-                let mut src_dep_paths = vec![];
-                let mut dep_paths = vec![];
-                for dep_path in &compile_option.sources_deps {
-                    if dep_path.split('/').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.split('\\').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.contains("/tests/")
-                        || dep_path.contains("/tests\\")
-                        || dep_path.contains(r"/tests\\")
-                        || dep_path.contains(r"\\tests\\")
-                    {
-                        continue;
-                    }
-                    src_dep_paths.push(dep_path.clone());
-                }
-                for dep_path in &compile_option.dependencies {
-                    if dep_path.split('/').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.split('\\').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.contains("/tests/")
-                        || dep_path.contains("/tests\\")
-                        || dep_path.contains(r"/tests\\")
-                        || dep_path.contains(r"\\tests\\")
-                    {
-                        continue;
-                    }
-                    dep_paths.push(dep_path.clone());
-                }
-                let mut helper = HashMap::new();
-                for (addr_name, addr_num) in addrs.iter() {
-                    helper.insert(addr_name.clone(), addr_num.to_string());
-                }
-                new_project.addrname_2_addrnum = helper;
-                new_project.global_env = move_model::run_model_builder_in_compiler_mode(
-                    PackageInfo {
-                        sources: compile_option.sources,
-                        address_map: addrs.clone(),
-                    },
-                    PackageInfo {
-                        sources: src_dep_paths,
-                        address_map: addrs.clone(),
-                    },
-                    vec![PackageInfo {
-                        sources: dep_paths,
-                        address_map: addrs.clone(),
-                    }],
-                    true,
-                    &Default::default(),
-                    LanguageVersion::V2_1,
-                    false,
-                    false,
-                    true,
-                    true,
-                )?;
-                Ok(Default::default())
-            },
-        )?;
-
+        new_project.get_global_env_by_move_package_v2(&working_dir)?;
         log::info!(
             "new_project.global_env.get_module_count() = {:?}",
             new_project.global_env.get_module_count()
