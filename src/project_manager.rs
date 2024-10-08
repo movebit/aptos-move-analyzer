@@ -375,13 +375,13 @@ impl Project {
         new_project
             .global_env
             .report_diag(&mut error_writer, Severity::Error);
-        let err_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-        if err_diags.len() > 0 {
+        new_project.err_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+        if new_project.err_diags.len() > 0 {
             log::error!(
-                "\n*******************************************\n\nerr_diags = \n{}",
-                err_diags
+                "\n*******************************************\nerr_diags = \n{}",
+                new_project.err_diags
             );
-            log::error!("\n*******************************************\n");
+            eprintln!("*******************************************\n");
         }
         Ok(new_project)
     }
@@ -409,14 +409,7 @@ impl Project {
         self.targets = new_project.targets.clone();
         self.dependents = new_project.dependents.clone();
         self.global_env = new_project.global_env;
-        log::info!(
-            "env.get_module_count() = {:?}",
-            &self.global_env.get_module_count()
-        );
-        let mut error_writer = Buffer::no_color();
-        self.global_env
-            .report_diag(&mut error_writer, Severity::Error);
-        self.err_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+        self.err_diags = new_project.err_diags;
     }
 
     /// Load a Move.toml project.

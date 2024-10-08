@@ -17,6 +17,7 @@ use aptos_move_analyzer::{
 };
 use clap::Parser;
 use crossbeam::channel::{bounded, select, Sender};
+use itertools::Itertools;
 use log::{Level, Metadata, Record};
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
@@ -324,10 +325,100 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
 }
 
 fn on_response(_context: &Context, _response: &Response) {
-    log::info!("handle response[{:?}] from client", _response);
+    log::debug!("handle response[{:?}] from client", _response);
 }
 
 type DiagSender = Arc<Mutex<Sender<(PathBuf, Diagnostics)>>>;
+
+fn clear_ui_diag(context: &mut Context, fpath: PathBuf) {
+    let proj = match context.projects.get_project(&fpath) {
+        Some(x) => x,
+        None => {
+            log::error!("project not found:{:?}", fpath.as_path());
+            return;
+        }
+    };
+
+    let mut result: HashMap<Url, Vec<lsp_types::Diagnostic>> = HashMap::new();
+    let diag_err = proj.err_diags.clone();
+    let tokens: Vec<&str> = diag_err.as_str().split("error: ").collect();
+    log::info!("clear_ui_diag diag tokens.len = {:?}", tokens.len());
+    for token in tokens {
+        let line_vec = token.lines().collect_vec();
+        if line_vec.len() < 3 {
+            continue;
+        }
+        let err_msg = line_vec[0];
+        let loc_str = line_vec[1];
+        log::error!("clear_ui_diag diag err_msg = {:?}", err_msg);
+
+        let mut file_path = "";
+        let mut pos = lsp_types::Position::default();
+        let mut path_start_pos = 0;
+        if let Some(start_idx) = loc_str.find('/') {
+            path_start_pos = start_idx;
+        }
+        if let Some(start_idx) = loc_str.find(r":\") {
+            // windows path
+            path_start_pos = start_idx - 1;
+        }
+        if let Some(end_idx) = loc_str.find(r".move:") {
+            if path_start_pos <= end_idx {
+                file_path = &loc_str[path_start_pos..end_idx + ".move".to_string().len()];
+                let line = loc_str[end_idx..].split(':').nth(1).unwrap_or_default();
+                let col = loc_str[end_idx..].split(':').nth(2).unwrap_or_default();
+                let line_num = if line.parse::<u32>().unwrap() > 0 {
+                    line.parse::<u32>().unwrap() - 1
+                } else {
+                    line.parse::<u32>().unwrap()
+                };
+                let col_num = if col.parse::<u32>().unwrap() > 0 {
+                    col.parse::<u32>().unwrap() - 1
+                } else {
+                    col.parse::<u32>().unwrap()
+                };
+                pos = lsp_types::Position::new(line_num, col_num);
+            }
+        }
+        log::error!("clear_ui_diag diag file_path = {:?}", file_path);
+
+        if file_path.is_empty() {
+            continue;
+        }
+
+        let mut code_str = "".to_string();
+        for line_idx in 2..line_vec.len() {
+            code_str.push_str(line_vec[line_idx]);
+            code_str.push_str("\n");
+        }
+        log::error!(
+            "clear_ui_diag diag code_str = {:?}",
+            format!("{}\n{}", err_msg, code_str)
+        );
+        let d = lsp_types::Diagnostic {
+            range: lsp_types::Range {
+                start: pos,
+                end: pos,
+            },
+            severity: Some(lsp_types::DiagnosticSeverity::ERROR),
+            message: format!("{}\n{}", err_msg, code_str),
+            ..Default::default()
+        };
+        let url = url::Url::from_file_path(PathBuf::from(file_path).as_path()).unwrap();
+        result.insert(url, vec![d]);
+    }
+    for (k, _) in result.clone().into_iter() {
+        let ds = lsp_types::PublishDiagnosticsParams::new(k.clone(), vec![], None);
+        context
+            .connection
+            .sender
+            .send(lsp_server::Message::Notification(Notification {
+                method: lsp_types::notification::PublishDiagnostics::METHOD.to_string(),
+                params: serde_json::to_value(ds).unwrap(),
+            }))
+            .unwrap();
+    }
+}
 
 fn report_diag(context: &mut Context, fpath: PathBuf) {
     let proj = match context.projects.get_project(&fpath) {
@@ -340,62 +431,79 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
 
     let mut result: HashMap<Url, Vec<lsp_types::Diagnostic>> = HashMap::new();
     let diag_err = proj.err_diags.clone();
-    let tokens: Vec<&str> = diag_err.as_str().split("error").collect();
+    let tokens: Vec<&str> = diag_err.as_str().split("error: ").collect();
+    log::info!("report diag tokens.len = {:?}", tokens.len());
     for token in tokens {
-        if token.lines().count() < 3 {
+        let line_vec = token.lines().collect_vec();
+        if line_vec.len() < 3 {
             continue;
         }
-        let err_msg = token.lines().next().unwrap_or_default();
-        let loc_str = match token.lines().nth(1) {
-            Some(str) => str.to_string(),
-            None => "".to_string(),
-        };
+        let err_msg = line_vec[0];
+        let loc_str = line_vec[1];
+        log::error!("report diag err_msg = {:?}", err_msg);
 
         let mut file_path = "";
         let mut pos = lsp_types::Position::default();
+        let mut path_start_pos = 0;
         if let Some(start_idx) = loc_str.find('/') {
-            if let Some(end_idx) = loc_str.find(':') {
-                if start_idx <= end_idx {
-                    file_path = &loc_str[start_idx..end_idx];
-                    let line = loc_str[end_idx..].split(':').nth(1).unwrap_or_default();
-                    let col = loc_str[end_idx..].split(':').nth(2).unwrap_or_default();
-                    let line_num = if line.parse::<u32>().unwrap() > 0 {
-                        line.parse::<u32>().unwrap() - 1
-                    } else {
-                        line.parse::<u32>().unwrap()
-                    };
-                    let col_num = if col.parse::<u32>().unwrap() > 0 {
-                        col.parse::<u32>().unwrap() - 1
-                    } else {
-                        col.parse::<u32>().unwrap()
-                    };
-                    pos = lsp_types::Position::new(line_num, col_num);
-                }
+            path_start_pos = start_idx;
+        }
+        if let Some(start_idx) = loc_str.find(r":\") {
+            // windows path
+            path_start_pos = start_idx - 1;
+        }
+        if let Some(end_idx) = loc_str.find(r".move:") {
+            if path_start_pos <= end_idx {
+                file_path = &loc_str[path_start_pos..end_idx + ".move".to_string().len()];
+                let line = loc_str[end_idx..].split(':').nth(1).unwrap_or_default();
+                let col = loc_str[end_idx..].split(':').nth(2).unwrap_or_default();
+                let line_num = if line.parse::<u32>().unwrap() > 0 {
+                    line.parse::<u32>().unwrap() - 1
+                } else {
+                    line.parse::<u32>().unwrap()
+                };
+                let col_num = if col.parse::<u32>().unwrap() > 0 {
+                    col.parse::<u32>().unwrap() - 1
+                } else {
+                    col.parse::<u32>().unwrap()
+                };
+                pos = lsp_types::Position::new(line_num, col_num);
             }
         }
+        log::error!("report diag file_path = {:?}", file_path);
 
-        if file_path.contains("aptos-move/") || file_path.is_empty() {
+        if file_path.contains("aptos-move/")
+            || file_path.contains(r"aptos-move\")
+            || file_path.is_empty()
+        {
             continue;
         }
 
         let mut code_str = "".to_string();
-        for line_idx in 2..token.lines().count() {
-            code_str.push_str(token.lines().nth(line_idx).unwrap());
+        for line_idx in 2..line_vec.len() {
+            code_str.push_str(line_vec[line_idx]);
+            code_str.push_str("\n");
         }
+        log::error!(
+            "report diag code_str = {:?}",
+            format!("{}\n{}", err_msg, code_str)
+        );
         let d = lsp_types::Diagnostic {
             range: lsp_types::Range {
                 start: pos,
                 end: pos,
             },
             severity: Some(lsp_types::DiagnosticSeverity::ERROR),
-            message: format!("{}\n{}{:?}", err_msg, code_str, "".to_string()),
+            message: format!("{}\n{}", err_msg, code_str),
             ..Default::default()
         };
         let url = url::Url::from_file_path(PathBuf::from(file_path).as_path()).unwrap();
         result.insert(url, vec![d]);
     }
-    for (k, v) in result.into_iter() {
+    log::info!("report diag result = {:?}", result);
+    for (k, v) in result.clone().into_iter() {
         let ds = lsp_types::PublishDiagnosticsParams::new(k.clone(), v, None);
+        log::info!("report diag ds = {:?}", serde_json::to_value(ds.clone()));
         context
             .connection
             .sender
@@ -405,9 +513,25 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
             }))
             .unwrap();
     }
+    if result.is_empty() {
+        // clear all diags
+        context
+            .connection
+            .sender
+            .send(lsp_server::Message::Notification(Notification {
+                method: lsp_types::notification::PublishDiagnostics::METHOD.to_string(),
+                params: serde_json::to_value(lsp_types::PublishDiagnosticsParams {
+                    uri: url::Url::from_file_path(fpath.as_path()).unwrap(),
+                    diagnostics: vec![],
+                    version: None,
+                })
+                .unwrap(),
+            }))
+            .unwrap();
+    }
 }
 
-fn on_notification(context: &mut Context, notification: &Notification, diag_sender: DiagSender) {
+fn on_notification(context: &mut Context, notification: &Notification, _diag_sender: DiagSender) {
     fn update_defs_on_changed(context: &mut Context, fpath: PathBuf, content: String) {
         let file_hash = FileHash::new(content.as_str());
         context.projects.update_defs(fpath.clone(), content.clone());
@@ -442,8 +566,9 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
                     return;
                 }
             };
+            clear_ui_diag(context, fpath.clone());
             update_defs_on_changed(context, fpath.clone(), content);
-            make_diag(context, diag_sender, fpath);
+            // make_diag(context, diag_sender, fpath);
         }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
             use lsp_types::DidChangeTextDocumentParams;
@@ -452,11 +577,14 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
                     .expect("could not deserialize DidChangeTextDocumentParams request");
             let fpath = parameters.text_document.uri.to_file_path().unwrap();
             let fpath = path_concat(&std::env::current_dir().unwrap(), &fpath);
+
+            clear_ui_diag(context, fpath.clone());
             update_defs_on_changed(
                 context,
-                fpath,
+                fpath.clone(),
                 parameters.content_changes.last().unwrap().text.clone(),
             );
+            // make_diag(context, diag_sender, fpath.clone());
         }
 
         lsp_types::notification::DidOpenTextDocument::METHOD => {
@@ -476,9 +604,6 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
             };
             match context.projects.get_project(&fpath) {
                 Some(_) => {
-                    if std::fs::read_to_string(fpath.as_path()).is_ok() {
-                        // update_defs_on_changed(context, fpath.clone(), x);
-                    };
                     return;
                 }
                 None => {
@@ -494,7 +619,7 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
             };
 
             context.projects.insert_project(p);
-            make_diag(context, diag_sender, fpath.clone());
+            // make_diag(context, diag_sender, fpath.clone());
             report_diag(context, fpath);
         }
         lsp_types::notification::DidCloseTextDocument::METHOD => {
@@ -518,11 +643,12 @@ fn on_notification(context: &mut Context, notification: &Notification, diag_send
     }
 }
 
+#[allow(dead_code)]
 fn get_package_compile_diagnostics(pkg_path: &Path) -> Result<Diagnostics> {
     use anyhow::*;
-    use move_package::compilation::build_plan::BuildPlan;
     use move_model::metadata::CompilerVersion;
     use move_model::metadata::LanguageVersion;
+    use move_package::compilation::build_plan::BuildPlan;
     use tempfile::tempdir;
     let build_config = move_package::BuildConfig {
         test_mode: true,
@@ -567,7 +693,9 @@ fn get_package_compile_diagnostics(pkg_path: &Path) -> Result<Diagnostics> {
     }
 }
 
+#[allow(dead_code)]
 fn make_diag(context: &Context, diag_sender: DiagSender, fpath: PathBuf) {
+    log::info!(">> make_diag()");
     let (mani, _) = match aptos_move_analyzer::utils::discover_manifest_and_kind(fpath.as_path()) {
         Some(x) => x,
         None => {
@@ -578,6 +706,7 @@ fn make_diag(context: &Context, diag_sender: DiagSender, fpath: PathBuf) {
     match context.projects.get_project(&fpath) {
         Some(x) => {
             if !x.load_ok() {
+                log::error!("project not loaded.");
                 return;
             }
         }
@@ -591,8 +720,10 @@ fn make_diag(context: &Context, diag_sender: DiagSender, fpath: PathBuf) {
                 return;
             }
         };
+        log::error!("send diag to channel");
         diag_sender.lock().unwrap().send((mani, x)).unwrap();
     });
+    log::info!("<< make_diag()");
 }
 
 fn send_not_project_file_error(context: &mut Context, fpath: PathBuf, is_open: bool) {
@@ -636,7 +767,9 @@ fn send_not_project_file_error(context: &mut Context, fpath: PathBuf, is_open: b
 
 fn send_diag(context: &mut Context, mani: PathBuf, x: Diagnostics) {
     let mut result: HashMap<Url, Vec<lsp_types::Diagnostic>> = HashMap::new();
-    for x in x.into_codespan_format() {
+    let diag_vec = x.into_codespan_format();
+    log::error!("diag cnt = {:?}", diag_vec.len());
+    for x in diag_vec {
         let (s, msg, (loc, m), _, notes) = x;
         if let Some(r) = context.projects.convert_loc_range(&loc) {
             let url = url::Url::from_file_path(r.path.as_path()).unwrap();
@@ -694,8 +827,10 @@ fn send_diag(context: &mut Context, mani: PathBuf, x: Diagnostics) {
             context.diag_version.update(&mani, k, 0);
         }
     }
+
     for (k, v) in result.into_iter() {
         let ds = lsp_types::PublishDiagnosticsParams::new(k.clone(), v, None);
+        log::error!("diags = {:?}", serde_json::to_value(ds.clone()).unwrap());
         context
             .connection
             .sender
