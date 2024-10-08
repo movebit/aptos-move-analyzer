@@ -111,6 +111,7 @@ impl Project {
         self.manifest_not_exists.is_empty() && self.manifest_load_failures.is_empty()
     }
 
+    #[allow(dead_code)]
     fn get_global_env_by_move_package_v1(
         &mut self,
         report_err: impl FnMut(String) + Clone,

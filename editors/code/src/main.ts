@@ -231,19 +231,7 @@ async function maybeDownloadLspServer(): Promise<void> {
   if (
     userConfiguredAnalyzerLspPath !== dest_server_path
   ) {
-    // Check that the LSP is statically linked, we can assume
-    // this from the file size (if it's less than 1mb, conservatively it ain't statically linked)
-    log.info('before stat file');
-    const stats = fs.statSync(userConfiguredAnalyzerLspPath);
-    const fileSizeInBytes = stats.size;
-    const fileSizeInMegabytes = fileSizeInBytes / (1024 * 1024);
-    if (fileSizeInMegabytes <= 1) {
-      vscode.window.showErrorMessage(
-        "Local LSP path does not appear to point to a statically linked binary",
-      );
-      return;
-    }
-    log.info('before copy file');
+    log.info('use lsp-server provided by the user');
     fs.copyFileSync(userConfiguredAnalyzerLspPath, dest_server_path);
     analyzerLspPath = dest_server_path;
   } else {
