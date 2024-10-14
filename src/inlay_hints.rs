@@ -16,7 +16,7 @@ pub fn on_inlay_hints(
     request: &Request,
     inlay_hints_config: &InlayHintsConfig,
 ) -> lsp_server::Response {
-    log::info!("on_inlay_hints request = {:?}", request);
+    log::debug!("on_inlay_hints request = {:?}", request);
     let parameters = serde_json::from_value::<InlayHintParams>(request.params.clone())
         .expect("could not deserialize go-to-def request");
     let fpath = parameters.text_document.uri.to_file_path().unwrap();

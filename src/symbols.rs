@@ -57,7 +57,7 @@ use move_model::{
 /// Handles document symbol request of the language server
 #[allow(deprecated)]
 pub fn on_document_symbol_request(context: &Context, request: &Request) -> lsp_server::Response {
-    log::info!("on_document_symbol_request");
+    log::trace!("on_document_symbol_request");
     let parameters = serde_json::from_value::<DocumentSymbolParams>(request.params.clone())
         .expect("could not deserialize document symbol request");
 
@@ -107,7 +107,7 @@ pub fn on_document_symbol_request(context: &Context, request: &Request) -> lsp_s
 
     let mut result_vec_document_symbols: Vec<DocumentSymbol> = vec![];
     for module_env in module_envs {
-        log::info!(
+        log::trace!(
             "start handle module env name: {:?}",
             module_env.get_full_name_str()
         );

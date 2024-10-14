@@ -1,9 +1,7 @@
 // Copyright (c) The BitsLab.MoveBit Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
 use aptos_move_analyzer::{
-    analyzer_handler::ConvertLoc,
     completion,
     context::{Context, FileDiags},
     goto_definition, hover, inlay_hints,
@@ -16,7 +14,7 @@ use aptos_move_analyzer::{
     utils::*,
 };
 use clap::Parser;
-use crossbeam::channel::{bounded, select, Sender};
+use crossbeam::channel::select;
 use itertools::Itertools;
 use log::{Level, Metadata, Record};
 use lsp_server::{Connection, Message, Notification, Request, Response};
@@ -26,12 +24,9 @@ use lsp_types::{
     TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use move_command_line_common::files::FileHash;
-use move_compiler::{diagnostics::Diagnostics, PASS_COMPILATION};
-use move_package::CompilerConfig;
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    path::PathBuf,
 };
 use url::Url;
 
@@ -148,19 +143,9 @@ fn main() {
             }),
         )
         .expect("could not finish connection initialization");
-    let (diag_sender, diag_receiver) = bounded::<(PathBuf, Diagnostics)>(1);
-    let diag_sender = Arc::new(Mutex::new(diag_sender));
     let mut analyzer_cfg = AnalyzerConfig::default();
     loop {
         select! {
-            recv(diag_receiver) -> message => {
-                match message {
-                    Ok ((mani ,x)) => {
-                        send_diag(&mut context,mani,x);
-                    }
-                    Err(error) => log::error!("IDE diag message error: {:?}", error),
-                }
-            },
             recv(context.connection.receiver) -> message => {
                 context.projects.try_reload_projects(&context.connection);
                 match message {
@@ -174,7 +159,7 @@ fn main() {
                                 // It ought to, especially once it begins processing requests that may
                                 // take a long time to respond to.
                             }
-                            _ => on_notification(&mut context, &notification, diag_sender.clone()),
+                            _ => on_notification(&mut context, &notification),
                         }
                     }
                     Err(error) => log::error!("IDE message error: {:?}", error),
@@ -328,8 +313,6 @@ fn on_response(_context: &Context, _response: &Response) {
     log::debug!("handle response[{:?}] from client", _response);
 }
 
-type DiagSender = Arc<Mutex<Sender<(PathBuf, Diagnostics)>>>;
-
 fn clear_ui_diag(context: &mut Context, fpath: PathBuf) {
     let proj = match context.projects.get_project(&fpath) {
         Some(x) => x,
@@ -432,7 +415,6 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
     let mut result: HashMap<Url, Vec<lsp_types::Diagnostic>> = HashMap::new();
     let diag_err = proj.err_diags.clone();
     let tokens: Vec<&str> = diag_err.as_str().split("error: ").collect();
-    log::info!("report diag tokens.len = {:?}", tokens.len());
     for token in tokens {
         let line_vec = token.lines().collect_vec();
         if line_vec.len() < 3 {
@@ -440,7 +422,6 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
         }
         let err_msg = line_vec[0];
         let loc_str = line_vec[1];
-        log::error!("report diag err_msg = {:?}", err_msg);
 
         let mut file_path = "";
         let mut pos = lsp_types::Position::default();
@@ -470,7 +451,6 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
                 pos = lsp_types::Position::new(line_num, col_num);
             }
         }
-        log::error!("report diag file_path = {:?}", file_path);
 
         if file_path.contains("aptos-move/")
             || file_path.contains(r"aptos-move\")
@@ -531,7 +511,7 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
     }
 }
 
-fn on_notification(context: &mut Context, notification: &Notification, _diag_sender: DiagSender) {
+fn on_notification(context: &mut Context, notification: &Notification) {
     fn update_defs_on_changed(context: &mut Context, fpath: PathBuf, content: String) {
         let file_hash = FileHash::new(content.as_str());
         context.projects.update_defs(fpath.clone(), content.clone());
@@ -568,7 +548,6 @@ fn on_notification(context: &mut Context, notification: &Notification, _diag_sen
             };
             clear_ui_diag(context, fpath.clone());
             update_defs_on_changed(context, fpath.clone(), content);
-            // make_diag(context, diag_sender, fpath);
         }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
             use lsp_types::DidChangeTextDocumentParams;
@@ -584,7 +563,6 @@ fn on_notification(context: &mut Context, notification: &Notification, _diag_sen
                 fpath.clone(),
                 parameters.content_changes.last().unwrap().text.clone(),
             );
-            // make_diag(context, diag_sender, fpath.clone());
         }
 
         lsp_types::notification::DidOpenTextDocument::METHOD => {
@@ -619,7 +597,6 @@ fn on_notification(context: &mut Context, notification: &Notification, _diag_sen
             };
 
             context.projects.insert_project(p);
-            // make_diag(context, diag_sender, fpath.clone());
             report_diag(context, fpath);
         }
         lsp_types::notification::DidCloseTextDocument::METHOD => {
@@ -641,89 +618,6 @@ fn on_notification(context: &mut Context, notification: &Notification, _diag_sen
 
         _ => {}
     }
-}
-
-#[allow(dead_code)]
-fn get_package_compile_diagnostics(pkg_path: &Path) -> Result<Diagnostics> {
-    use anyhow::*;
-    use move_model::metadata::CompilerVersion;
-    use move_model::metadata::LanguageVersion;
-    use move_package::compilation::build_plan::BuildPlan;
-    use tempfile::tempdir;
-    let build_config = move_package::BuildConfig {
-        test_mode: true,
-        install_dir: Some(tempdir().unwrap().path().to_path_buf()),
-        skip_fetch_latest_git_deps: true,
-        compiler_config: CompilerConfig {
-            compiler_version: Some(CompilerVersion::V2_1),
-            language_version: Some(LanguageVersion::V2_1),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    // resolution graph diagnostics are only needed for CLI commands so ignore them by passing a
-    // vector as the writer
-    let resolution_graph = build_config.resolution_graph_for_package(pkg_path, &mut Vec::new())?;
-    let build_plan = BuildPlan::create(resolution_graph)?;
-    let mut diagnostics = None;
-    let compile_cfg = move_package::CompilerConfig {
-        compiler_version: Some(CompilerVersion::V2_1),
-        language_version: Some(LanguageVersion::V2_1),
-        ..Default::default()
-    };
-    build_plan.compile_with_driver(
-        &mut std::io::sink(),
-        &compile_cfg,
-        |compiler| {
-            let (_, compilation_result) = compiler.run::<PASS_COMPILATION>()?;
-            match compilation_result {
-                std::result::Result::Ok(_) => {}
-                std::result::Result::Err(diags) => {
-                    log::error!("PASS_COMPILATION get diags");
-                    diagnostics = Some(diags);
-                }
-            };
-            Ok(Default::default())
-        },
-        |_compiler| Ok(Default::default()),
-    )?;
-    match diagnostics {
-        Some(x) => Ok(x),
-        None => Ok(Default::default()),
-    }
-}
-
-#[allow(dead_code)]
-fn make_diag(context: &Context, diag_sender: DiagSender, fpath: PathBuf) {
-    log::info!(">> make_diag()");
-    let (mani, _) = match aptos_move_analyzer::utils::discover_manifest_and_kind(fpath.as_path()) {
-        Some(x) => x,
-        None => {
-            log::error!("manifest not found.");
-            return;
-        }
-    };
-    match context.projects.get_project(&fpath) {
-        Some(x) => {
-            if !x.load_ok() {
-                log::error!("project not loaded.");
-                return;
-            }
-        }
-        None => return,
-    };
-    std::thread::spawn(move || {
-        let x = match get_package_compile_diagnostics(mani.as_path()) {
-            Ok(x) => x,
-            Err(err) => {
-                log::error!("get_package_compile_diagnostics failed,err:{:?}", err);
-                return;
-            }
-        };
-        log::error!("send diag to channel");
-        diag_sender.lock().unwrap().send((mani, x)).unwrap();
-    });
-    log::info!("<< make_diag()");
 }
 
 fn send_not_project_file_error(context: &mut Context, fpath: PathBuf, is_open: bool) {
@@ -763,81 +657,4 @@ fn send_not_project_file_error(context: &mut Context, fpath: PathBuf, is_open: b
             params: serde_json::to_value(ds).unwrap(),
         }))
         .unwrap();
-}
-
-fn send_diag(context: &mut Context, mani: PathBuf, x: Diagnostics) {
-    let mut result: HashMap<Url, Vec<lsp_types::Diagnostic>> = HashMap::new();
-    let diag_vec = x.into_codespan_format();
-    log::error!("diag cnt = {:?}", diag_vec.len());
-    for x in diag_vec {
-        let (s, msg, (loc, m), _, notes) = x;
-        if let Some(r) = context.projects.convert_loc_range(&loc) {
-            let url = url::Url::from_file_path(r.path.as_path()).unwrap();
-            let d = lsp_types::Diagnostic {
-                range: r.mk_location().range,
-                severity: Some(match s {
-                    codespan_reporting::diagnostic::Severity::Bug => {
-                        lsp_types::DiagnosticSeverity::ERROR
-                    }
-                    codespan_reporting::diagnostic::Severity::Error => {
-                        lsp_types::DiagnosticSeverity::ERROR
-                    }
-                    codespan_reporting::diagnostic::Severity::Warning => {
-                        lsp_types::DiagnosticSeverity::WARNING
-                    }
-                    codespan_reporting::diagnostic::Severity::Note => {
-                        lsp_types::DiagnosticSeverity::INFORMATION
-                    }
-                    codespan_reporting::diagnostic::Severity::Help => {
-                        lsp_types::DiagnosticSeverity::HINT
-                    }
-                }),
-                message: format!(
-                    "{}\n{}{:?}",
-                    msg,
-                    m,
-                    if !notes.is_empty() {
-                        format!(" {:?}", notes)
-                    } else {
-                        "".to_string()
-                    }
-                ),
-                ..Default::default()
-            };
-            if let Some(a) = result.get_mut(&url) {
-                a.push(d);
-            } else {
-                result.insert(url, vec![d]);
-            };
-        }
-    }
-    // update version.
-    for (k, v) in result.iter() {
-        context.diag_version.update(&mani, k, v.len());
-    }
-    context.diag_version.with_manifest(&mani, |x| {
-        for (old, v) in x.iter() {
-            if !result.contains_key(old) && *v > 0 {
-                result.insert(old.clone(), vec![]);
-            }
-        }
-    });
-    for (k, x) in result.iter() {
-        if x.is_empty() {
-            context.diag_version.update(&mani, k, 0);
-        }
-    }
-
-    for (k, v) in result.into_iter() {
-        let ds = lsp_types::PublishDiagnosticsParams::new(k.clone(), v, None);
-        log::error!("diags = {:?}", serde_json::to_value(ds.clone()).unwrap());
-        context
-            .connection
-            .sender
-            .send(lsp_server::Message::Notification(Notification {
-                method: lsp_types::notification::PublishDiagnostics::METHOD.to_string(),
-                params: serde_json::to_value(ds).unwrap(),
-            }))
-            .unwrap();
-    }
 }
