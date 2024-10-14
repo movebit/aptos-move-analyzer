@@ -25,7 +25,7 @@
 - support find references on ENUM
 - fix issue#13: build failed when conflicting modules occur
 
-## 2024/10/15 v1.0.4
-
-### Commits
-* [[`d2a9b42`](https://github.com/movebit/aptos-move-analyzer/commit/d2a9b426c1a6e9daf13f0494875c275fc10bbe30)] - add clear_ui_diag() (robin)
+## 2024/10/14 v1.0.4
+- fix issue#12: odd behaviors with diag report
+- add clear_ui_diag()
+- optimize code
