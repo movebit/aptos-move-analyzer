@@ -238,3 +238,79 @@ module std::main {
 }
     "#);
 }
+
+#[test]
+fn test_resolve_struct_from_function_parameter_type() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::main {
+    struct S { val: u8 }
+         //X
+    fun main(s: S) {
+              //^
+    }
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_function_parameter() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::main {
+    fun main(s: u8) {
+           //X
+        s;
+      //^
+    }
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_variable() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::main {
+    fun main() {
+        let s = 1;
+          //X
+        s;
+      //^
+    }
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_variable_with_parameter_shadowing() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::main {
+    fun main(s: u8) {
+        let s = 1;
+          //X
+        s;
+      //^
+    }
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_variable_with_another_variable_shadowing() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::main {
+    fun main(s: u8) {
+        let s = 1;
+        let s = 2;
+          //X
+        s;
+      //^
+    }
+}
+    "#);
+}
+
+
