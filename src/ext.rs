@@ -40,12 +40,13 @@ impl GlobalEnvExt for GlobalEnv {
     }
 }
 
-pub(crate) trait LocOwner {
-    fn loc(&self) -> &move_model::model::Loc;
-
-    fn loc_contains(&self, env: &GlobalEnv, pos: (u32, u32)) -> bool {
+pub(crate) trait LocExt {
+    fn contains(&self, env: &GlobalEnv, pos: (u32, u32)) -> bool;
+}
+impl LocExt for move_model::model::Loc {
+    fn contains(&self, env: &GlobalEnv, pos: (u32, u32)) -> bool {
         let (line, col) = pos;
-        match env.get_location_span(self.loc()) {
+        match env.get_location_span(self) {
             (Some(start_loc), Some(end_loc)) => {
                 u32::from(start_loc.line) == line
                     && u32::from(start_loc.column) <= col
@@ -53,12 +54,6 @@ pub(crate) trait LocOwner {
             }
             _ => false,
         }
-    }
-}
-
-impl LocOwner for UseDecl {
-    fn loc(&self) -> &Loc {
-        &self.loc
     }
 }
 
