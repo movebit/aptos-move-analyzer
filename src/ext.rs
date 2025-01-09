@@ -21,7 +21,8 @@ impl GlobalEnvExt for GlobalEnv {
     ) -> Option<codespan::Location> {
         self.get_location(&move_model::model::Loc::new(
             file_id,
-            codespan::Span::new(offset, offset + codespan::ByteOffset(1)),
+            // `start` can be equal to `end`, get_location() ignores `end` anyway
+            codespan::Span::new(offset, offset),
         ))
     }
 

@@ -313,4 +313,169 @@ module std::main {
     "#);
 }
 
+#[test]
+fn test_resolve_struct_field() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::main {
+    struct S { val: u8 }
+              //X
+    fun main() {
+        S { val: 1 }
+            //^
+    }
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_struct_field_in_struct_pattern() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::main {
+    struct S { val: u8 }
+              //X
+    fun main(s: S) {
+        let S { val: myval } = s;
+              //^
+    }
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_struct_field_in_dot_expr() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::main {
+    struct S { val: u8 }
+              //X
+    fun main() {
+        let s = S { val: 1 };
+        s.val;
+         //^
+    }
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_const() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::main {
+    const MY_ERR: u8 = 1;
+          //X
+    fun main() {
+        MY_ERR;
+      //^
+    }
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_module_in_use_stmt() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::m {
+          //X
+}
+module std::main {
+    use std::m;
+           //^
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_module_in_use_item_stmt() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::m {
+          //X
+    public fun call() {}
+}
+module std::main {
+    use std::m::call;
+           //^
+}
+    "#);
+}
+
+#[ignore = "bug, i don't know"]
+#[test]
+fn test_resolve_module_in_qualified_ref() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::m {
+          //X
+    public fun call() {}
+}
+module std::main {
+    use std::m;
+    fun main() {
+        m::call();
+      //^
+    }
+}
+    "#);
+}
+
+#[ignore = "bug, i don't know"]
+#[test]
+fn test_resolve_module_in_qualified_ref_with_self() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::m {
+          //X
+    public fun call() {}
+}
+module std::main {
+    use std::m::Self;
+    fun main() {
+        m::call();
+      //^
+    }
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_module_item_in_qualified_ref() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::m {
+    public fun call() {}
+              //X
+}
+module std::main {
+    use std::m;
+    fun main() {
+        m::call();
+          //^
+    }
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_module_item_in_qualified_ref_with_self() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::m {
+    public fun call() {}
+              //X
+}
+module std::main {
+    use std::m::Self;
+    fun main() {
+        m::call();
+          //^
+    }
+}
+    "#);
+}
+
+
 
