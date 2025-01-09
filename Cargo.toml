@@ -48,6 +48,9 @@ enum-iterator = "1.2.0"
 num-bigint = "0.4.0"
 home = "0.5.3"
 
+[dev-dependencies]
+line-col = "0.2.1"
+
 [target.'cfg(not(target_os= "windows"))'.dependencies]
 pprof = { version = "0.11.0" , features = ["flamegraph" , "protobuf"]}
 

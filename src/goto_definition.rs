@@ -1,6 +1,7 @@
 // Copyright (c) The BitsLab.Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::project::Project;
 use crate::{
     analyzer_handler::*,
     context::*,
@@ -49,12 +50,8 @@ pub fn on_go_to_def_request(context: &Context, request: &Request) -> lsp_server:
             };
         }
     };
-    let mut handler = Handler::new(fpath.clone(), line, col);
-    handler.addrname_2_addrnum = project.addrname_2_addrnum.clone();
-    project.run_visitor_for_file(&mut handler, &fpath, String::default());
 
-    handler.remove_not_in_loc(&project.global_env);
-    let locations = handler.convert_to_locations();
+    let locations = on_goto_definition(&project, fpath.clone(), line, col);
 
     let r = Response::new_ok(
         request.id.clone(),
@@ -68,6 +65,20 @@ pub fn on_go_to_def_request(context: &Context, request: &Request) -> lsp_server:
         .unwrap();
     log::trace!("goto definition Success");
     ret_response
+}
+
+pub fn on_goto_definition(
+    project: &Project,
+    ref_fpath: PathBuf,
+    ref_line: u32,
+    ref_col: u32,
+) -> Vec<lsp_types::Location> {
+    let mut handler = Handler::new(ref_fpath.clone(), ref_line, ref_col);
+    handler.addrname_2_addrnum = project.addrname_2_addrnum.clone();
+    project.run_visitor_for_file(&mut handler, &ref_fpath, String::default());
+
+    handler.remove_not_in_loc(&project.global_env);
+    handler.convert_to_locations()
 }
 
 pub(crate) struct Handler {
@@ -769,6 +780,7 @@ impl Handler {
         if !found_target_struct {
             return;
         }
+
 
         let target_module = env.get_module(self.target_module_id);
         let target_struct = target_module.get_struct(target_struct_id);
