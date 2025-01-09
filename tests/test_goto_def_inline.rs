@@ -116,6 +116,22 @@ module std::main {
     "#);
 }
 
+#[ignore = "numeric addresses are not supported"]
+#[test]
+fn test_resolve_function_in_use_stmt_with_numeric_address() {
+    // language=Move
+    test_resolve_reference(r#"
+module 0x1::m {
+    public fun call() {}
+               //X
+}
+module 0x1::main {
+    use 0x1::m::call;
+                //^
+}
+    "#);
+}
+
 #[ignore = "resolution is not implemented for local use statements"]
 #[test]
 fn test_resolve_function_in_local_use_stmt() {
