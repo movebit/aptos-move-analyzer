@@ -116,6 +116,24 @@ module std::main {
     "#);
 }
 
+#[ignore = "resolution is not implemented for local use statements"]
+#[test]
+fn test_resolve_function_in_local_use_stmt() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::m {
+    public fun call() {}
+               //X
+}
+module std::main {
+    fun main() {
+        use std::m::call;
+                    //^
+    }
+}
+    "#);
+}
+
 #[test]
 fn test_resolve_function_in_use_group() {
     // language=Move
@@ -127,6 +145,38 @@ module std::m {
 module std::main {
     use std::m::{call};
                 //^
+}
+    "#);
+}
+
+#[test]
+fn test_resolve_module_self_in_use_group() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::m {
+          //X
+    public fun call() {}
+}
+module std::main {
+    use std::m::{Self, call};
+                //^
+}
+    "#);
+}
+
+#[ignore = "resolution is not implemented for multiline use groups yet"]
+#[test]
+fn test_resolve_module_self_in_use_group_multiline() {
+    // language=Move
+    test_resolve_reference(r#"
+module std::m {
+          //X
+    public fun call() {}
+}
+module std::main {
+    use std::m::{
+        Self, call};
+        //^
 }
     "#);
 }
