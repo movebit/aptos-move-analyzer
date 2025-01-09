@@ -25,13 +25,13 @@ tempfile = "3.2.0"
 url = "2.2.2"
 clap = { version = "3.1.8", features = ["derive"] }
 crossbeam = "0.8"
-move-model = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-model" }
-move-command-line-common = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-command-line-common" }
-move-compiler = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-compiler" }
-move-ir-types = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-ir-types" }
-move-package = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-package" }
-move-symbol-pool = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-symbol-pool" }
-move-core-types = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-core-types" }
+move-model = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-model" }
+move-command-line-common = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-command-line-common" }
+move-compiler = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-compiler" }
+move-ir-types = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-ir-types" }
+move-package = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-package" }
+move-symbol-pool = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-symbol-pool" }
+move-core-types = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-core-types" }
 movefmt = { git = "https://github.com/movebit/movefmt.git", branch = "develop" }
 commentfmt = { git = "https://github.com/movebit/movefmt.git", branch = "develop", package = "commentfmt" }
 itertools = "0.10.0"
@@ -45,7 +45,7 @@ home = "0.5.3"
 line-col = "0.2.1"
 
 [target.'cfg(not(target_os= "windows"))'.dependencies]
-pprof = { version = "0.11.0" , features = ["flamegraph" , "protobuf"]}
+pprof = { version = "0.11.0", features = ["flamegraph", "protobuf"] }
 
 [features]
 aptos = []

@@ -252,6 +252,7 @@ impl Project {
         let (_, env) = build_plan.compile_with_driver(
             &mut std::io::sink(),
             &compile_cfg,
+            vec![],
             |_compiler| Ok(Default::default()),
             |compile_option| {
                 let addrs = move_model::parse_addresses_from_options(

@@ -67,7 +67,7 @@ impl<'a> fmt::Display for TypeDisplayForSpec<'a> {
                 }
                 f.write_str(">")
             }
-            Fun(a, t) => {
+            Fun(a, t, _) => {
                 f.write_str("|")?;
                 write!(f, "{}", self.make(a))?;
                 f.write_str("|")?;

@@ -1,7 +1,7 @@
 use codespan::FileId;
 use move_core_types::account_address::AccountAddress;
-use move_model::ast::{Address, ModuleName, UseDecl};
-use move_model::model::{GlobalEnv, Loc};
+use move_model::ast::{Address, ModuleName};
+use move_model::model::GlobalEnv;
 use std::collections::HashMap;
 use std::hash::Hash;
 
