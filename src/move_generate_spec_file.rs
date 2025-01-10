@@ -7,8 +7,6 @@ use crate::{
     utils::{collect_use_decl, get_modules_by_fpath_in_target_modules},
 };
 use lsp_server::*;
-use move_command_line_common::address::NumericalAddress;
-use move_compiler::expansion::ast::Address;
 use move_model::model::{FunctionEnv, StructEnv};
 use serde::Deserialize;
 use std::{

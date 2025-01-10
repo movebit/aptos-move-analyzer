@@ -1,7 +1,7 @@
 use crate::ext::LocExt;
-use crate::utils::{fpath_str_is_equal, get_modules_by_fpath_in_all_modules};
+use crate::utils::get_modules_by_fpath_in_all_modules;
 use move_model::ast::{ModuleName, UseDecl};
-use move_model::model::{GlobalEnv, ModuleEnv};
+use move_model::model::GlobalEnv;
 use std::path::{Path, PathBuf};
 
 pub enum Reference {

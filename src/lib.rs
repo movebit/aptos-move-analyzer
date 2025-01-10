@@ -56,3 +56,4 @@ pub mod type_display_for_spec;
 
 pub(crate) mod ext;
 pub(crate) mod name_resolution;
+pub(crate) mod path_utils;

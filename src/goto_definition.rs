@@ -22,6 +22,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
+use move_model::ast::{Address, ModuleName};
 
 /// Handles go-to-def request of the language server.
 pub fn on_go_to_def_request(context: &Context, request: &Request) -> lsp_server::Response {
@@ -74,7 +75,7 @@ pub fn on_goto_definition(
     ref_col: u32,
 ) -> Vec<lsp_types::Location> {
     let mut handler = Handler::new(ref_fpath.clone(), ref_line, ref_col);
-    handler.addrname_2_addrnum = project.addrname_2_addrnum.clone();
+    // handler.addrname_2_addrnum = project.addrname_2_addrnum.clone();
     project.run_visitor_for_file(&mut handler, &ref_fpath, String::default());
 
     handler.remove_not_in_loc(&project.global_env);
@@ -94,7 +95,7 @@ pub(crate) struct Handler {
     pub(crate) target_module_id: ModuleId,
     pub(crate) target_function_id: Option<FunId>,
     pub(crate) symbol_2_pattern_id: HashMap<Symbol, NodeId>, // LocalVar => Block::Pattern, only remeber the last pattern
-    pub(crate) addrname_2_addrnum: HashMap<String, String>,
+    // pub(crate) addrname_2_addrnum: HashMap<String, String>,
 }
 
 impl Handler {
@@ -110,7 +111,7 @@ impl Handler {
             target_module_id: ModuleId::new(0),
             target_function_id: None,
             symbol_2_pattern_id: HashMap::new(),
-            addrname_2_addrnum: HashMap::new(),
+            // addrname_2_addrnum: HashMap::new(),
         }
     }
 
@@ -312,25 +313,38 @@ impl Handler {
             if !self.check_move_model_loc_contains_mouse_pos(env, &use_decl.loc) {
                 continue;
             }
-            let (_, use_pos) = env.get_file_and_location(&use_decl.loc).unwrap();
+            let use_pos = env.get_location(&use_decl.loc).unwrap();
             log::info!("find use decl module, line: {}", use_pos.line);
 
-            let used_module_name = use_decl.module_name.display_full(env).to_string();
-            let before_after = used_module_name.split("::").collect::<Vec<_>>();
-            if before_after.len() < 2 {
-                log::error!("use decl module name len should >= 2");
-                continue;
-            }
-
-            let addrnum = match self.addrname_2_addrnum.get(&before_after[0].to_string()) {
-                Some(x) => x,
-                None => {
-                    log::error!("could not convert addrname to addrnum, please check you use decl");
-                    continue;
+            let module_name = use_decl.module_name.clone();
+            let numeric_module_name = match module_name.addr() {
+                Address::Symbolic(sym) => {
+                    let Some(addr) = env.resolve_address_alias(*sym) else {
+                        log::error!("could not convert addrname to addrnum, please check you use decl");
+                        continue;
+                    };
+                    ModuleName::new(Address::Numerical(addr), module_name.name())
                 }
+                _ => module_name
             };
 
-            addrnum_with_module_name = addrnum.clone() + "::" + before_after[1];
+            // let used_module_name = use_decl.module_name.display_full(env).to_string();
+            // let before_after = used_module_name.split("::").collect::<Vec<_>>();
+            // if before_after.len() < 2 {
+            //     log::error!("use decl module name len should >= 2");
+            //     continue;
+            // }
+            //
+            // let addrnum = match self.addrname_2_addrnum.get(&before_after[0].to_string()) {
+            //     Some(x) => x,
+            //     None => {
+            //         log::error!("could not convert addrname to addrnum, please check you use decl");
+            //         continue;
+            //     }
+            // };
+
+            // addrnum_with_module_name = addrnum.clone() + "::" + before_after[1];
+            addrnum_with_module_name = numeric_module_name.display_full(&env).to_string();
             found_usedecl_same_line = true;
             capture_items_loc = use_decl.loc.clone();
 
@@ -346,7 +360,8 @@ impl Handler {
                     }
                 }
             } else {
-                target_stct_or_fn = before_after[1].to_string();
+                // target_stct_or_fn = before_after[1].to_string();
+                target_stct_or_fn = env.symbol_pool().string(numeric_module_name.name()).to_string();
                 found_target_stct_or_fn = true;
             }
             if found_target_stct_or_fn {

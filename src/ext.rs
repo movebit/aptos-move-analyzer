@@ -3,7 +3,6 @@ use move_core_types::account_address::AccountAddress;
 use move_model::ast::{Address, ModuleName};
 use move_model::model::GlobalEnv;
 use std::collections::HashMap;
-use std::hash::Hash;
 
 pub trait GlobalEnvExt {
     fn get_location_at_offset(

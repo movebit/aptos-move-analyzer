@@ -28,6 +28,7 @@ crossbeam = "0.8"
 move-model = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-model" }
 move-command-line-common = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-command-line-common" }
 move-compiler = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-compiler" }
+move-compiler_v2 = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-compiler-v2" }
 move-ir-types = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-ir-types" }
 move-package = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-package" }
 move-symbol-pool = { git = "https://github.com/mkurnikov/aptos-core.git", branch = "aptos-move-analyzer", package = "move-symbol-pool" }

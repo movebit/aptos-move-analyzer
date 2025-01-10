@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::utils::*;
-use crate::{analyzer_handler::*, project::Project};
+use crate::{analyzer_handler::*, path_utils, project::Project};
 use anyhow::{Ok, Result};
 use codespan_reporting::diagnostic::Severity;
 use codespan_reporting::term::termcolor::Buffer;
@@ -258,72 +258,87 @@ impl Project {
                 let addrs = move_model::parse_addresses_from_options(
                     compile_option.named_address_mapping.clone(),
                 )?;
-                // log::info!("\n*******************************************\n\n addrs = \n{:?}", addrs);
-                // log::info!("\n*******************************************\n\n sources = \n{:?}", compile_option.sources);
-                // log::info!(
-                //     "\n*******************************************\n\n sources = \n{:?}",
-                //     compile_option.sources_deps
-                // );
-                let mut src_dep_paths = vec![];
-                let mut dep_paths = vec![];
-                for dep_path in &compile_option.sources_deps {
-                    if dep_path.split('/').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.split('\\').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.contains("/tests/")
-                        || dep_path.contains("/tests\\")
-                        || dep_path.contains(r"/tests\\")
-                        || dep_path.contains(r"\\tests\\")
-                    {
-                        continue;
-                    }
-                    src_dep_paths.push(dep_path.clone());
-                }
-                for dep_path in &compile_option.dependencies {
-                    if dep_path.split('/').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.split('\\').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.contains("/tests/")
-                        || dep_path.contains("/tests\\")
-                        || dep_path.contains(r"/tests\\")
-                        || dep_path.contains(r"\\tests\\")
-                    {
-                        continue;
-                    }
-                    dep_paths.push(dep_path.clone());
-                }
                 let mut helper = HashMap::new();
                 for (addr_name, addr_num) in addrs.iter() {
                     helper.insert(addr_name.clone(), addr_num.to_string());
                 }
                 self.addrname_2_addrnum = helper;
-                let env = move_model::run_model_builder_in_compiler_mode(
-                    PackageInfo {
-                        sources: compile_option.sources,
-                        address_map: addrs.clone(),
-                    },
-                    PackageInfo {
-                        sources: src_dep_paths,
-                        address_map: addrs.clone(),
-                    },
-                    vec![PackageInfo {
-                        sources: dep_paths,
-                        address_map: addrs.clone(),
-                    }],
-                    true,
-                    &Default::default(),
-                    LanguageVersion::V2_1,
-                    false,
-                    false,
-                    true,
-                    true,
-                )?;
+
+                let no_tests_source_deps = compile_option
+                    .sources_deps
+                    .iter()
+                    .filter(|dep| path_utils::has_path_component_with_name(&dep.into(), "tests"))
+                    .map(|dep| dep.to_owned())
+                    .collect::<Vec<_>>();
+                let no_tests_dependencies = compile_option
+                    .dependencies
+                    .iter()
+                    .filter(|dep| path_utils::has_path_component_with_name(&dep.into(), "tests"))
+                    .map(|dep| dep.to_owned())
+                    .collect::<Vec<_>>();
+                let no_tests_compiler_options = move_compiler_v2::Options {
+                    sources_deps: no_tests_source_deps,
+                    dependencies: no_tests_dependencies,
+                    ..compile_option
+                };
+                let env = move_compiler_v2::run_checker(no_tests_compiler_options)?;
+
+                // let mut src_dep_paths = vec![];
+                // let mut dep_paths = vec![];
+                // for dep_path in &compile_option.sources_deps {
+                //     if dep_path.split('/').find(|&x| x == "tests").is_some() {
+                //         continue;
+                //     }
+                //     if dep_path.split('\\').find(|&x| x == "tests").is_some() {
+                //         continue;
+                //     }
+                //     if dep_path.contains("/tests/")
+                //         || dep_path.contains("/tests\\")
+                //         || dep_path.contains(r"/tests\\")
+                //         || dep_path.contains(r"\\tests\\")
+                //     {
+                //         continue;
+                //     }
+                //     src_dep_paths.push(dep_path.clone());
+                // }
+                // for dep_path in &compile_option.dependencies {
+                //     let path = PathBuf::from(dep_path);
+                //     if dep_path.split('/').find(|&x| x == "tests").is_some() {
+                //         continue;
+                //     }
+                //     if dep_path.split('\\').find(|&x| x == "tests").is_some() {
+                //         continue;
+                //     }
+                //     if dep_path.contains("/tests/")
+                //         || dep_path.contains("/tests\\")
+                //         || dep_path.contains(r"/tests\\")
+                //         || dep_path.contains(r"\\tests\\")
+                //     {
+                //         continue;
+                //     }
+                //     dep_paths.push(dep_path.clone());
+                // }
+                // let env = move_model::run_model_builder_in_compiler_mode(
+                //     PackageInfo {
+                //         sources: compile_option.sources,
+                //         address_map: addrs.clone(),
+                //     },
+                //     PackageInfo {
+                //         sources: no_tests_source_deps,
+                //         address_map: addrs.clone(),
+                //     },
+                //     vec![PackageInfo {
+                //         sources: no_tests_dependencies,
+                //         address_map: addrs.clone(),
+                //     }],
+                //     true,
+                //     &Default::default(),
+                //     LanguageVersion::V2_1,
+                //     false,
+                //     false,
+                //     true,
+                //     true,
+                // )?;
                 self.global_env = env;
                 log::info!(
                     "self.global_env.get_module_count() = {:?}",

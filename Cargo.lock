@@ -189,6 +189,7 @@ dependencies = [
  "lsp-types",
  "move-command-line-common 0.1.0 (git+https://github.com/mkurnikov/aptos-core.git?branch=aptos-move-analyzer)",
  "move-compiler 0.0.1 (git+https://github.com/mkurnikov/aptos-core.git?branch=aptos-move-analyzer)",
+ "move-compiler-v2 0.1.0 (git+https://github.com/mkurnikov/aptos-core.git?branch=aptos-move-analyzer)",
  "move-core-types 0.0.4 (git+https://github.com/mkurnikov/aptos-core.git?branch=aptos-move-analyzer)",
  "move-ir-types 0.1.0 (git+https://github.com/mkurnikov/aptos-core.git?branch=aptos-move-analyzer)",
  "move-model 0.1.0 (git+https://github.com/mkurnikov/aptos-core.git?branch=aptos-move-analyzer)",
