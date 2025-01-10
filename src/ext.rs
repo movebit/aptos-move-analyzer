@@ -2,8 +2,8 @@ use codespan::FileId;
 use move_core_types::account_address::AccountAddress;
 use move_model::ast::{Address, ModuleName};
 use move_model::model::GlobalEnv;
-use std::collections::HashMap;
 use move_model::symbol::{Symbol, SymbolPool};
+use std::collections::HashMap;
 
 pub trait GlobalEnvExt {
     fn get_location_at_offset(
@@ -42,6 +42,7 @@ impl GlobalEnvExt for GlobalEnv {
 
 pub(crate) trait LocExt {
     fn contains(&self, env: &GlobalEnv, pos: (u32, u32)) -> bool;
+    fn contains_line(&self, env: &GlobalEnv, line: u32) -> bool;
 }
 impl LocExt for move_model::model::Loc {
     fn contains(&self, env: &GlobalEnv, pos: (u32, u32)) -> bool {
@@ -51,6 +52,14 @@ impl LocExt for move_model::model::Loc {
                 u32::from(start_loc.line) == line
                     && u32::from(start_loc.column) <= col
                     && col <= u32::from(end_loc.column)
+            }
+            _ => false,
+        }
+    }
+    fn contains_line(&self, env: &GlobalEnv, line: u32) -> bool {
+        match env.get_location_span(self) {
+            (Some(start_loc), Some(end_loc)) => {
+                u32::from(start_loc.line) <= line && line <= u32::from(end_loc.line)
             }
             _ => false,
         }

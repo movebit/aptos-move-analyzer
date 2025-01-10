@@ -648,31 +648,11 @@ impl Handler {
 
         for spec_block_info in target_module.get_spec_block_infos() {
             if let SpecBlockTarget::Function(_, fun_id) = spec_block_info.target {
-                let span_first_col = move_model::model::Loc::new(
-                    spec_block_info.loc.file_id(),
-                    codespan::Span::new(
-                        spec_block_info.loc.span().start(),
-                        spec_block_info.loc.span().start() + codespan::ByteOffset(1),
-                    ),
-                );
-                let span_last_col = move_model::model::Loc::new(
-                    spec_block_info.loc.file_id(),
-                    codespan::Span::new(
-                        spec_block_info.loc.span().end(),
-                        spec_block_info.loc.span().end() + codespan::ByteOffset(1),
-                    ),
-                );
-
-                if let Some(s_loc) = env.get_location(&span_first_col) {
-                    if let Some(e_loc) = env.get_location(&span_last_col) {
-                        if u32::from(s_loc.line) <= self.line && self.line <= u32::from(e_loc.line)
-                        {
-                            target_fun_id = fun_id;
-                            found_target_fun = true;
-                            spec_fn_span_loc = spec_block_info.loc.clone();
-                            break;
-                        }
-                    }
+                if spec_block_info.loc.contains_line(&env, self.line) {
+                    target_fun_id = fun_id;
+                    found_target_fun = true;
+                    spec_fn_span_loc = spec_block_info.loc.clone();
+                    break;
                 }
             }
         }
@@ -695,31 +675,20 @@ impl Handler {
 
     fn process_struct(&mut self, env: &GlobalEnv) {
         log::info!(">> process_struct for goto definition");
-        let mut found_target_struct = false;
-        let mut target_struct_id = StructId::new(env.symbol_pool().make("name"));
         let target_module = env.get_module(self.target_module_id);
-        for struct_env in target_module.get_structs() {
-            let struct_loc = struct_env.get_loc();
-            let (_, struct_start_pos) = env.get_file_and_location(&struct_loc).unwrap();
-            let (_, struct_end_pos) = env
-                .get_file_and_location(&move_model::model::Loc::new(
-                    struct_loc.file_id(),
-                    codespan::Span::new(struct_loc.span().end(), struct_loc.span().end()),
-                ))
-                .unwrap();
-            if struct_start_pos.line.0 < self.line && self.line < struct_end_pos.line.0 {
-                target_struct_id = struct_env.get_id();
-                found_target_struct = true;
-                break;
-            }
-        }
-        if !found_target_struct {
-            return;
-        }
 
-        let target_module = env.get_module(self.target_module_id);
-        let target_struct = target_module.get_struct(target_struct_id);
+        let Some(target_struct) = target_module.get_structs().find(|s| {
+            let struct_loc = s.get_loc();
+            let struct_start_pos = env.get_location(&struct_loc).unwrap();
+            let struct_end_pos = env
+                .get_location_at_offset(struct_loc.file_id(), struct_loc.span().end())
+                .unwrap();
+            struct_start_pos.line.0 < self.line && self.line < struct_end_pos.line.0
+        }) else {
+            return;
+        };
         let target_struct_loc = target_struct.get_loc();
+
         self.mouse_span = self.get_mouse_loc(env, &target_struct_loc);
 
         let (offset_spos, offset_epos) = self.get_mouse_token_span(env, &target_struct_loc);
@@ -781,52 +750,31 @@ impl Handler {
 
     fn process_spec_struct(&mut self, env: &GlobalEnv) {
         log::trace!("process_spec_struct for goto definition\n\n");
-        let mut found_target_spec_stct = false;
-        let mut target_stct_id = StructId::new(env.symbol_pool().make("name"));
+        let mut found_target_spec_struct = false;
+        let mut target_struct_id = StructId::new(env.symbol_pool().make("name"));
         let target_module = env.get_module(self.target_module_id);
-        let mut spec_stct_span_loc = target_module.get_loc();
+        let mut spec_struct_span_loc = target_module.get_loc();
 
         for spec_block_info in target_module.get_spec_block_infos() {
-            if let SpecBlockTarget::Struct(_, stct_id) = spec_block_info.target {
-                let span_first_col = move_model::model::Loc::new(
-                    spec_block_info.loc.file_id(),
-                    codespan::Span::new(
-                        spec_block_info.loc.span().start(),
-                        spec_block_info.loc.span().start() + codespan::ByteOffset(1),
-                    ),
-                );
-                let span_last_col = move_model::model::Loc::new(
-                    spec_block_info.loc.file_id(),
-                    codespan::Span::new(
-                        spec_block_info.loc.span().end(),
-                        spec_block_info.loc.span().end() + codespan::ByteOffset(1),
-                    ),
-                );
-
-                if let Some(s_loc) = env.get_location(&span_first_col) {
-                    if let Some(e_loc) = env.get_location(&span_last_col) {
-                        if u32::from(s_loc.line) <= self.line && self.line <= u32::from(e_loc.line)
-                        {
-                            target_stct_id = stct_id;
-                            found_target_spec_stct = true;
-                            spec_stct_span_loc = spec_block_info.loc.clone();
-                            break;
-                        }
-                    }
+            if let SpecBlockTarget::Struct(_, struct_id) = spec_block_info.target {
+                if spec_block_info.loc.contains_line(&env, self.line) {
+                    target_struct_id = struct_id;
+                    found_target_spec_struct = true;
+                    spec_struct_span_loc = spec_block_info.loc.clone();
+                    break;
                 }
             }
         }
-
-        if !found_target_spec_stct {
+        if !found_target_spec_struct {
             log::trace!("<< not found_target_spec_stct");
             return;
         }
 
-        let target_stct = target_module.get_struct(target_stct_id);
-        let target_stct_spec = target_stct.get_spec();
-        log::info!("target_stct's spec = {}", env.display(&*target_stct_spec));
-        self.mouse_span = self.get_mouse_loc(env, &spec_stct_span_loc);
-        for cond in target_stct_spec.conditions.clone() {
+        let target_struct = target_module.get_struct(target_struct_id);
+        let target_struct_spec = target_struct.get_spec();
+        log::info!("target_stct's spec = {}", env.display(&*target_struct_spec));
+        self.mouse_span = self.get_mouse_loc(env, &spec_struct_span_loc);
+        for cond in target_struct_spec.conditions.clone() {
             for exp in cond.all_exps() {
                 self.process_expr(env, exp);
             }

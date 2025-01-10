@@ -541,5 +541,87 @@ module std::main {
     "#);
 }
 
+#[ignore = "not implemented"]
+#[test]
+fn test_resolve_module_spec() {
+    // language=Move
+    test_resolve_reference(r#"
+module 0x1::m {
+          //X
+}
+spec 0x1::m {
+        //^
+}
+    "#)
+}
+
+#[ignore = "not implemented"]
+#[test]
+fn test_resolve_function_spec() {
+    // language=Move
+    test_resolve_reference(r#"
+module 0x1::m {
+    fun main() {}
+        //X
+}
+spec 0x1::m {
+    spec main {}
+        //^
+}
+    "#)
+}
+
+#[ignore = "not implemented?"]
+#[test]
+fn test_resolve_struct_spec() {
+    // language=Move
+    test_resolve_reference(r#"
+module 0x1::m {
+    struct S { val: u8 }
+         //X
+}
+spec 0x1::m {
+    spec S {}
+       //^
+}
+    "#)
+}
+
+#[ignore = "not implemented"]
+#[test]
+fn test_resolve_function_call_inside_spec() {
+    // language=Move
+    test_resolve_reference(r#"
+module 0x1::m {
+    fun main() {}
+       //X
+}
+spec 0x1::m {
+    spec main {
+        main();
+       //^
+    }
+}
+    "#)
+}
+
+#[ignore = "not implemented"]
+#[test]
+fn test_resolve_function_call_inside_spec_inside_module() {
+    // language=Move
+    test_resolve_reference(r#"
+module 0x1::m {
+    fun call() {}
+       //X
+    public fun main() {
+    }
+    spec main {
+        call();
+       //^
+    }
+}
+    "#)
+}
+
 
 
