@@ -261,7 +261,6 @@ module std::main {
     "#);
 }
 
-#[ignore = "bug, single line functions are broken"]
 #[test]
 fn test_resolve_struct_from_type_single_line_function() {
     // language=Move
@@ -290,7 +289,6 @@ module std::main {
     "#);
 }
 
-#[ignore = "bug, stmt on the same line as the end of outer block"]
 #[test]
 fn test_resolve_struct_from_struct_literal_single_line() {
     // language=Move

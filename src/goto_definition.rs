@@ -390,7 +390,7 @@ impl Handler {
             let func_end_pos = env
                 .get_location_at_offset(func_loc.file_id(), func_loc.span().end())
                 .unwrap();
-            func_start_pos.line.0 <= self.line && self.line < func_end_pos.line.0
+            func_start_pos.line.0 <= self.line && self.line <= func_end_pos.line.0
         }) else {
             return;
         };
