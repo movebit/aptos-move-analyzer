@@ -3,6 +3,7 @@ use move_core_types::account_address::AccountAddress;
 use move_model::ast::{Address, ModuleName};
 use move_model::model::GlobalEnv;
 use std::collections::HashMap;
+use move_model::symbol::{Symbol, SymbolPool};
 
 pub trait GlobalEnvExt {
     fn get_location_at_offset(
@@ -53,6 +54,15 @@ impl LocExt for move_model::model::Loc {
             }
             _ => false,
         }
+    }
+}
+
+pub(crate) trait SymbolExt {
+    fn string(&self, env: &GlobalEnv) -> String;
+}
+impl SymbolExt for Symbol {
+    fn string(&self, env: &GlobalEnv) -> String {
+        env.symbol_pool().string(*self).to_string()
     }
 }
 

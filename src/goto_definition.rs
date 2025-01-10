@@ -1,6 +1,7 @@
 // Copyright (c) The BitsLab.Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::ext::{GlobalEnvExt, LocExt, SymbolExt};
 use crate::project::Project;
 use crate::{
     analyzer_handler::*,
@@ -13,6 +14,7 @@ use lsp_server::*;
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
 use move_compiler::parser::lexer::{Lexer, Tok};
+use move_model::ast::{Address, ModuleName};
 use move_model::{
     ast::{ExpData::*, Operation::*, Pattern as MoveModelPattern, Spec, SpecBlockTarget},
     model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, ModuleId, NodeId, StructId},
@@ -22,7 +24,6 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use move_model::ast::{Address, ModuleName};
 
 /// Handles go-to-def request of the language server.
 pub fn on_go_to_def_request(context: &Context, request: &Request) -> lsp_server::Response {
@@ -95,7 +96,7 @@ pub(crate) struct Handler {
     pub(crate) target_module_id: ModuleId,
     pub(crate) target_function_id: Option<FunId>,
     pub(crate) symbol_2_pattern_id: HashMap<Symbol, NodeId>, // LocalVar => Block::Pattern, only remeber the last pattern
-    // pub(crate) addrname_2_addrnum: HashMap<String, String>,
+                                                             // pub(crate) addrname_2_addrnum: HashMap<String, String>,
 }
 
 impl Handler {
@@ -164,12 +165,17 @@ impl Handler {
         ret
     }
 
-    fn get_mouse_loc(&mut self, env: &GlobalEnv, target_fn_or_struct_loc: &move_model::model::Loc) {
+    fn get_mouse_loc(
+        &self,
+        env: &GlobalEnv,
+        target_item_loc: &move_model::model::Loc,
+    ) -> codespan::Span {
+        let file_id = target_item_loc.file_id();
         let mut mouse_line_first_col = move_model::model::Loc::new(
-            target_fn_or_struct_loc.file_id(),
+            file_id,
             codespan::Span::new(
-                target_fn_or_struct_loc.span().start(),
-                target_fn_or_struct_loc.span().start() + codespan::ByteOffset(1),
+                target_item_loc.span().start(),
+                target_item_loc.span().start() + codespan::ByteOffset(1),
             ),
         );
 
@@ -177,7 +183,7 @@ impl Handler {
         // locate to self.line first column
         while mouse_loc.line.0 < self.line {
             mouse_line_first_col = move_model::model::Loc::new(
-                target_fn_or_struct_loc.file_id(),
+                file_id,
                 codespan::Span::new(
                     mouse_line_first_col.span().end(),
                     mouse_line_first_col.span().end() + codespan::ByteOffset(1),
@@ -188,7 +194,7 @@ impl Handler {
 
         // locate to self.line last column
         let mut mouse_line_last_col = move_model::model::Loc::new(
-            target_fn_or_struct_loc.file_id(),
+            file_id,
             codespan::Span::new(
                 mouse_line_first_col.span().end(),
                 mouse_line_first_col.span().end() + codespan::ByteOffset(1),
@@ -199,7 +205,7 @@ impl Handler {
         // locate to self.line first column
         while mouse_loc.column.0 < self.col && mouse_loc.line.0 == self.line {
             mouse_line_last_col = move_model::model::Loc::new(
-                target_fn_or_struct_loc.file_id(),
+                file_id,
                 codespan::Span::new(
                     mouse_line_last_col.span().end(),
                     mouse_line_last_col.span().end() + codespan::ByteOffset(1),
@@ -209,17 +215,18 @@ impl Handler {
         }
 
         let mouse_source = env.get_source(&move_model::model::Loc::new(
-            target_fn_or_struct_loc.file_id(),
+            file_id,
             codespan::Span::new(
                 mouse_line_first_col.span().start(),
                 mouse_line_last_col.span().start(),
             ),
         ));
         log::info!("get mouse_source = {:?}", mouse_source);
-        self.mouse_span = codespan::Span::new(
+
+        codespan::Span::new(
             mouse_line_first_col.span().start(),
             mouse_line_last_col.span().start(),
-        );
+        )
     }
 
     fn get_mouse_token_span(
@@ -302,181 +309,95 @@ impl Handler {
     fn process_use_decl(&mut self, env: &GlobalEnv) {
         log::info!("process_use_decl for goto definition");
         let target_module = env.get_module(self.target_module_id);
-        let spool = env.symbol_pool();
-        let mut target_stct_or_fn = String::default();
-        let mut found_target_stct_or_fn = false;
-        let mut found_usedecl_same_line = false;
-        let mut capture_items_loc = move_model::model::Loc::default();
-        let mut addrnum_with_module_name = Default::default();
 
-        for use_decl in target_module.get_use_decls() {
-            if !self.check_move_model_loc_contains_mouse_pos(env, &use_decl.loc) {
-                continue;
-            }
-            let use_pos = env.get_location(&use_decl.loc).unwrap();
-            log::info!("find use decl module, line: {}", use_pos.line);
+        let mut target_name = String::default();
+        let mut found_target_use_item = false;
 
-            let module_name = use_decl.module_name.clone();
-            let numeric_module_name = match module_name.addr() {
-                Address::Symbolic(sym) => {
-                    let Some(addr) = env.resolve_address_alias(*sym) else {
-                        log::error!("could not convert addrname to addrnum, please check you use decl");
-                        continue;
-                    };
-                    ModuleName::new(Address::Numerical(addr), module_name.name())
-                }
-                _ => module_name
-            };
+        let mouse_position = (self.line, self.col);
 
-            // let used_module_name = use_decl.module_name.display_full(env).to_string();
-            // let before_after = used_module_name.split("::").collect::<Vec<_>>();
-            // if before_after.len() < 2 {
-            //     log::error!("use decl module name len should >= 2");
-            //     continue;
-            // }
-            //
-            // let addrnum = match self.addrname_2_addrnum.get(&before_after[0].to_string()) {
-            //     Some(x) => x,
-            //     None => {
-            //         log::error!("could not convert addrname to addrnum, please check you use decl");
-            //         continue;
-            //     }
-            // };
-
-            // addrnum_with_module_name = addrnum.clone() + "::" + before_after[1];
-            addrnum_with_module_name = numeric_module_name.display_full(&env).to_string();
-            found_usedecl_same_line = true;
-            capture_items_loc = use_decl.loc.clone();
-
-            if !use_decl.members.is_empty() {
-                for (member_loc, name, _alias_name) in use_decl.members.clone().into_iter() {
-                    log::info!("member_loc = {:?} ---", env.get_location(&member_loc));
-                    if self.check_move_model_loc_contains_mouse_pos(env, &member_loc) {
-                        target_stct_or_fn = name.display(spool).to_string();
-                        found_target_stct_or_fn = true;
-                        capture_items_loc = member_loc;
-                        log::info!("find use decl member {}", target_stct_or_fn);
-                        break;
-                    }
-                }
-            } else {
-                // target_stct_or_fn = before_after[1].to_string();
-                target_stct_or_fn = env.symbol_pool().string(numeric_module_name.name()).to_string();
-                found_target_stct_or_fn = true;
-            }
-            if found_target_stct_or_fn {
-                break;
-            }
-        }
-
-        if !found_target_stct_or_fn && !found_usedecl_same_line {
+        let Some(target_use_decl) = target_module
+            .get_use_decls()
+            .iter()
+            .find(|u| u.loc.contains(&env, mouse_position))
+        else {
+            // cannot find use declaration at pointer position
             return;
-        }
-
-        let mut option_use_module: Option<ModuleEnv<'_>> = None;
-        for mo_env in env.get_modules() {
-            let mo_name_str = mo_env.get_name().display_full(env).to_string();
-            log::info!(
-                "addrnum_with_module_name = {:?}, mo_name_str = {:?}",
-                addrnum_with_module_name,
-                mo_name_str
-            );
-            if addrnum_with_module_name.len() != mo_name_str.len() {
-                continue;
-            }
-
-            if mo_name_str.to_lowercase() == addrnum_with_module_name.to_lowercase() {
-                option_use_module = Some(mo_env);
-                break;
-            }
-        }
-
-        let use_decl_module = match option_use_module {
-            Some(x) => x,
-            None => return,
         };
 
-        self.get_mouse_loc(env, &capture_items_loc);
-        if found_target_stct_or_fn {
-            log::info!("finding use decl module member...");
-            for stct in use_decl_module.get_structs() {
-                log::info!(
-                    "per_struct_name = {:?}, target_struct: {}",
-                    stct.get_full_name_str(),
-                    target_stct_or_fn
-                );
-                if stct.get_full_name_str().contains(&target_stct_or_fn) {
-                    log::info!("stct.get_full_name_str() = {:?}", stct.get_full_name_str());
-                    log::info!(
-                        "insert_result<use_decl> = {:?}",
-                        env.get_source(&capture_items_loc)
-                    );
-                    self.insert_result(env, &stct.get_loc(), &capture_items_loc);
+        let module_name = target_use_decl.module_name.clone();
+        let numeric_module_name = match module_name.addr() {
+            Address::Symbolic(sym) => {
+                let Some(addr) = env.resolve_address_alias(*sym) else {
+                    log::error!("could not convert addrname to addrnum, please check you use decl");
+                    return;
+                };
+                ModuleName::new(Address::Numerical(addr), module_name.name())
+            }
+            _ => module_name,
+        };
+
+        let target_fq_module_name = numeric_module_name.display_full(&env).to_string();
+        let mut capture_items_loc = target_use_decl.loc.clone();
+
+        if !target_use_decl.members.is_empty() {
+            for (member_loc, name, _alias_name) in target_use_decl.members.clone().into_iter() {
+                if member_loc.contains(&env, mouse_position) {
+                    target_name = name.string(&env);
+                    found_target_use_item = true;
+                    capture_items_loc = member_loc;
+                    break;
+                }
+            }
+        } else {
+            target_name = numeric_module_name.name().string(&env);
+            found_target_use_item = true;
+        }
+
+        let Some(source_module) = env
+            .get_modules()
+            .find(|m| m.get_full_name_str().to_lowercase() == target_fq_module_name.to_lowercase())
+        else {
+            return;
+        };
+
+        self.mouse_span = self.get_mouse_loc(env, &capture_items_loc);
+
+        if found_target_use_item {
+            for struct_ in source_module.get_structs() {
+                if struct_.get_name().string(&env) == target_name {
+                    self.insert_result(env, &struct_.get_loc(), &capture_items_loc);
                     return;
                 }
             }
-            for func in use_decl_module.get_functions() {
-                log::trace!(
-                    "per_fun_name = {:?}, target_fun: {}",
-                    func.get_full_name_str(),
-                    target_stct_or_fn
-                );
-                if func.get_name_str().contains(&target_stct_or_fn) {
-                    log::info!("func.get_name_str() = {:?}", func.get_name_str());
-                    log::info!(
-                        "insert_result<use_decl> = {:?}",
-                        env.get_source(&capture_items_loc)
-                    );
+            for func in source_module.get_functions() {
+                if func.get_name_str() == target_name {
                     self.insert_result(env, &func.get_loc(), &capture_items_loc);
                     return;
                 }
             }
         }
 
-        if found_usedecl_same_line {
-            log::info!("find use decl module...");
-            self.insert_result(env, &use_decl_module.get_loc(), &capture_items_loc)
-        }
+        self.insert_result(env, &source_module.get_loc(), &capture_items_loc);
     }
 
     fn process_func(&mut self, env: &GlobalEnv) {
         log::info!("process_func for goto defnition");
-        let mut found_target_fun = false;
-        let mut target_fun_id = FunId::new(env.symbol_pool().make("name"));
 
         let target_module = env.get_module(self.target_module_id);
-        for fun in target_module.get_functions() {
-            let this_fun_loc = fun.get_loc();
-            let (_, func_start_pos) = env.get_file_and_location(&this_fun_loc).unwrap();
-            let (_, func_end_pos) = env
-                .get_file_and_location(&move_model::model::Loc::new(
-                    this_fun_loc.file_id(),
-                    codespan::Span::new(this_fun_loc.span().end(), this_fun_loc.span().end()),
-                ))
+        let Some(target_fun) = target_module.get_functions().find(|func| {
+            let func_loc = func.get_loc();
+            let func_start_pos = env.get_location(&func.get_loc()).unwrap();
+            let func_end_pos = env
+                .get_location_at_offset(func_loc.file_id(), func_loc.span().end())
                 .unwrap();
-
-            if func_start_pos.line.0 <= self.line && self.line < func_end_pos.line.0 {
-                log::info!(
-                    "get target function {}: func_start_pos = {:?}, func_end_pos = {:?}",
-                    fun.get_name_string(),
-                    func_start_pos,
-                    func_end_pos
-                );
-                target_fun_id = fun.get_id();
-                found_target_fun = true;
-                break;
-            }
-        }
-
-        if !found_target_fun {
+            func_start_pos.line.0 <= self.line && self.line < func_end_pos.line.0
+        }) else {
             return;
-        }
+        };
 
-        let target_module = env.get_module(self.target_module_id);
-        let target_fun = target_module.get_function(target_fun_id);
-        let target_fun_loc: move_model::model::Loc = target_fun.get_loc();
         self.target_function_id = Some(target_fun.get_id());
-        self.get_mouse_loc(env, &target_fun_loc);
+        self.mouse_span = self.get_mouse_loc(env, &target_fun.get_loc());
+
         self.process_parameter(env, &target_fun);
         self.process_return_type_and_specifiers(env, &target_fun);
 
@@ -764,7 +685,7 @@ impl Handler {
         let target_fn = target_module.get_function(target_fun_id);
         let target_fn_spec = target_fn.get_spec();
         log::info!("target_fun's spec = {}", env.display(&*target_fn_spec));
-        self.get_mouse_loc(env, &spec_fn_span_loc);
+        self.mouse_span = self.get_mouse_loc(env, &spec_fn_span_loc);
         for cond in target_fn_spec.conditions.clone() {
             for exp in cond.all_exps() {
                 self.process_expr(env, exp);
@@ -796,11 +717,10 @@ impl Handler {
             return;
         }
 
-
         let target_module = env.get_module(self.target_module_id);
         let target_struct = target_module.get_struct(target_struct_id);
         let target_struct_loc = target_struct.get_loc();
-        self.get_mouse_loc(env, &target_struct_loc);
+        self.mouse_span = self.get_mouse_loc(env, &target_struct_loc);
 
         let (offset_spos, offset_epos) = self.get_mouse_token_span(env, &target_struct_loc);
         if offset_spos == 0
@@ -905,7 +825,7 @@ impl Handler {
         let target_stct = target_module.get_struct(target_stct_id);
         let target_stct_spec = target_stct.get_spec();
         log::info!("target_stct's spec = {}", env.display(&*target_stct_spec));
-        self.get_mouse_loc(env, &spec_stct_span_loc);
+        self.mouse_span = self.get_mouse_loc(env, &spec_stct_span_loc);
         for cond in target_stct_spec.conditions.clone() {
             for exp in cond.all_exps() {
                 self.process_expr(env, exp);
