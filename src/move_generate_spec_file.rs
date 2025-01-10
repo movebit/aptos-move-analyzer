@@ -70,35 +70,7 @@ where
                 addr_num_and_module_name_to_addr_name.insert(k, addr_name.to_string());
             }
         }
-        // let maybe_numeric_addr = match module.self_address() {
-        //     // move_model::model::Address::Numerical(account_address) => {
-        //     //     Some(*account_address)
-        //     // }
-        //     move_model::model::Address::Symbolic(sym) => {
-        //         env.resolve_address_alias(*sym)
-        //     }
-        // };
-        // if let Some(addr) = maybe_numeric_addr {
-        //     let module_name = module.get_name().display(&env).to_string();
-        //     let addr_name =
-        //     addr_num_and_module_name_to_addr_name.insert((addr.to_standard_string(), module_name), )
-        // }
     });
-    // env.get_module_idents()
-    //     .iter()
-    //     .for_each(|module_ident| match module_ident.address {
-    //         Address::Numerical(may_addr_symbol, addr_num) => {
-    //             if let Some(addr_symbol) = may_addr_symbol {
-    //                 let k = (
-    //                     addr_num.value.to_string().to_uppercase(),
-    //                     module_ident.module.to_string(),
-    //                 );
-    //                 eprintln!("{:?} : {}", k.clone(), addr_symbol.value.to_string());
-    //                 addr_num_and_module_name_to_addr_name.insert(k, addr_symbol.value.to_string());
-    //             }
-    //         }
-    //         Address::NamedUnassigned(_) => {}
-    //     });
 
     for module_env in get_modules_by_fpath_in_target_modules(&project.global_env, &fpath) {
         let using_module_map = collect_use_decl(
