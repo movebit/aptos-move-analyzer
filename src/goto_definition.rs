@@ -2,20 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::ext::{from_ast_loc, numeric_fq_module_name, GlobalEnvExt, LocExt, SymbolExt};
-use crate::name_resolution::{find_reference, Reference};
+use crate::name_resolution::{find_reference, Reference, TypeOwner};
 use crate::project::Project;
 use crate::{
     analyzer_handler::*,
     context::*,
     utils::{path_concat, FileRange},
 };
-use codespan::Span;
+use codespan::{FileId, Span};
 use itertools::Itertools;
 use lsp_server::*;
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
 use move_compiler::parser::ast::ModuleIdent_;
 use move_compiler::parser::lexer::{Lexer, Tok};
+use move_compiler::shared::Identifier;
+use move_model::ast::ModuleName;
+use move_model::model::ModuleEnv;
 use move_model::{
     ast::{ExpData::*, Operation::*, Pattern as MoveModelPattern, Spec, SpecBlockTarget},
     model::{FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, StructId},
@@ -25,7 +28,6 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use move_compiler::shared::Identifier;
 
 /// Handles go-to-def request of the language server.
 pub fn on_go_to_def_request(context: &Context, request: &Request) -> lsp_server::Response {
@@ -317,8 +319,12 @@ impl Handler {
 
         match reference {
             Reference::UseModule { module_ident } => {
-                let ModuleIdent_ { address, module: module_name } = module_ident.value;
-                let source_module_fq_name = numeric_fq_module_name(env, Some(address), module_name)?;
+                let ModuleIdent_ {
+                    address,
+                    module: module_name,
+                } = module_ident.value;
+                let source_module_fq_name =
+                    numeric_fq_module_name(env, Some(address), module_name)?;
                 let source_module = env.get_modules().find(|m| {
                     m.get_full_name_str().to_lowercase() == source_module_fq_name.to_lowercase()
                 })?;
@@ -333,8 +339,12 @@ impl Handler {
                 module_ident,
                 item_name,
             } => {
-                let ModuleIdent_ { address, module: module_name } = module_ident.value;
-                let source_module_fq_name = numeric_fq_module_name(env, Some(address), module_name)?;
+                let ModuleIdent_ {
+                    address,
+                    module: module_name,
+                } = module_ident.value;
+                let source_module_fq_name =
+                    numeric_fq_module_name(env, Some(address), module_name)?;
                 let source_module = env.get_modules().find(|m| {
                     m.get_full_name_str().to_lowercase() == source_module_fq_name.to_lowercase()
                 })?;
@@ -360,9 +370,66 @@ impl Handler {
                     }
                 }
             }
-            _ => { return None; }
+            _ => {
+                return None;
+            }
         }
 
+        None
+    }
+
+    fn process_reference(
+        &mut self,
+        env: &GlobalEnv,
+        file_id: FileId,
+        mouse_pos: (u32, u32),
+    ) -> Option<move_model::model::Loc> {
+        let reference = find_reference(env, file_id, mouse_pos)?;
+        match reference {
+            Reference::TypeRef { owner, type_ } => {
+                let target_type_loc = from_ast_loc(file_id, type_.loc);
+                match owner {
+                    TypeOwner::FnReturnType {
+                        module_name,
+                        fun_id,
+                    } => {
+                        let ref_module = env.find_module_by_name(module_name.name())?;
+
+                        let function = ref_module.get_function(fun_id);
+                        self.mouse_span = self.get_mouse_loc(env, &function.get_loc());
+
+                        let return_type = function.get_result_type();
+                        let found = self.process_type(env, &target_type_loc, &return_type);
+                        if found {
+                            return Some(target_type_loc);
+                        }
+                    }
+                    TypeOwner::FnParameter {
+                        module_name,
+                        fun_id,
+                        param_name,
+                    } => {
+                        // todo: use address too
+                        let ref_module = env.find_module_by_name(module_name.name())?;
+
+                        let function = ref_module.get_function(fun_id);
+                        self.mouse_span = self.get_mouse_loc(env, &function.get_loc());
+
+                        let parameter = function
+                            .get_parameters()
+                            .into_iter()
+                            .find(|p| p.get_name().string(env) == param_name)?;
+                        let parameter_type = parameter.1;
+                        let found = self.process_type(env, &target_type_loc, &parameter_type);
+                        if found {
+                            return Some(target_type_loc);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        };
         None
     }
 
@@ -1273,6 +1340,14 @@ impl Handler {
             log::error!("<goto def>cannot get target module\n");
             return;
         }
+
+        // let file_id = candidate_modules.first().unwrap().get_loc().file_id();
+        // let resolved_loc = self.process_reference(env, file_id, (self.line, self.col));
+        // if resolved_loc.is_some() {
+        //     // found smth
+        //     return;
+        // }
+
         for module_env in candidate_modules.iter() {
             self.target_module_id = module_env.get_id();
             if let Some(s) = move_file_path.to_str() {
