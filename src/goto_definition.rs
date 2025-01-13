@@ -26,6 +26,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
+use move_compiler::shared::Identifier;
 
 /// Handles go-to-def request of the language server.
 pub fn on_go_to_def_request(context: &Context, request: &Request) -> lsp_server::Response {
@@ -312,14 +313,13 @@ impl Handler {
         log::info!("process_use_decl for goto definition");
         let target_module = env.get_module(self.target_module_id);
 
-        let mouse_position = (self.line, self.col);
-
         let file_id = target_module.get_loc().file_id();
-        let reference = find_reference(env, file_id, mouse_position)?;
+        let reference = find_reference(env, file_id, (self.line, self.col))?;
 
         match reference {
             Reference::UseModule { module_ident } => {
-                let source_module_fq_name = numeric_fq_module_name(env, module_ident)?;
+                let ModuleIdent_ { address, module: module_name } = module_ident.value;
+                let source_module_fq_name = numeric_fq_module_name(env, Some(address), module_name)?;
                 let source_module = env.get_modules().find(|m| {
                     m.get_full_name_str().to_lowercase() == source_module_fq_name.to_lowercase()
                 })?;
@@ -334,7 +334,8 @@ impl Handler {
                 module_ident,
                 item_name,
             } => {
-                let source_module_fq_name = numeric_fq_module_name(env, module_ident)?;
+                let ModuleIdent_ { address, module: module_name } = module_ident.value;
+                let source_module_fq_name = numeric_fq_module_name(env, Some(address), module_name)?;
                 let source_module = env.get_modules().find(|m| {
                     m.get_full_name_str().to_lowercase() == source_module_fq_name.to_lowercase()
                 })?;
@@ -360,6 +361,17 @@ impl Handler {
                     }
                 }
             }
+            _ => { return None; }
+            // Reference::Module { address, module_name } => {
+            //     let source_module_fq_name = numeric_fq_module_name(env, address, module_name)?;
+            //     let source_module = env.get_modules().find(|m| {
+            //         m.get_full_name_str().to_lowercase() == source_module_fq_name.to_lowercase()
+            //     })?;
+            //     let captured_item_loc = from_ast_loc(file_id, module_name.loc());
+            //     self.mouse_span = self.get_mouse_loc(env, &captured_item_loc);
+            //     self.insert_result(env, &source_module.get_loc(), &captured_item_loc);
+            //     return None;
+            // }
         }
 
         None

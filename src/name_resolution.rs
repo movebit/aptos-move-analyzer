@@ -1,8 +1,8 @@
 use crate::ext::{from_ast_loc, LocExt};
 use move_command_line_common::files::FileHash;
 use move_compiler::diagnostics::Diagnostics;
-use move_compiler::parser::ast::{Definition, ModuleIdent, ModuleMember, Use};
-use move_compiler::shared::CompilationEnv;
+use move_compiler::parser::ast::{Definition, LeadingNameAccess, ModuleIdent, ModuleMember, Use};
+use move_compiler::shared::{CompilationEnv, Identifier};
 use move_compiler::{parser, Flags, MatchedFileCommentMap};
 use move_model::model::GlobalEnv;
 use std::collections::BTreeSet;
@@ -23,8 +23,11 @@ pub enum Reference {
         module_ident: ModuleIdent,
         item_name: move_compiler::shared::Name,
     },
-    // Function(FunctionEnv<'a>),
-    // Struct(StructEnv<'a>),
+    ModuleRef {
+        address: Option<LeadingNameAccess>,
+        module_name: parser::ast::ModuleName,
+    },
+    // todo:
 }
 
 pub fn find_reference(
@@ -47,6 +50,16 @@ pub fn find_reference(
             _ => None,
         })
         .find(|module| contains_pos(module.loc))?;
+
+    if module.is_spec_module {
+        // spec 0x1::m {}
+        if contains_pos(module.name.loc()) {
+            return Some(Reference::ModuleRef {
+                address: module.address.clone(),
+                module_name: module.name,
+            });
+        }
+    }
 
     for member in module.members.iter() {
         match member {

@@ -1,10 +1,10 @@
 use codespan::{FileId, Span};
-use move_compiler::parser::ast::{Definition, LeadingNameAccess_, ModuleIdent, ModuleIdent_};
-use move_core_types::account_address::AccountAddress;
-use move_model::ast::{Address, ModuleName};
-use move_model::model::{GlobalEnv, Loc};
-use move_model::symbol::{Symbol, SymbolPool};
-use std::collections::HashMap;
+use move_compiler::parser;
+use move_compiler::parser::ast::{
+    LeadingNameAccess, LeadingNameAccess_,
+};
+use move_model::model::GlobalEnv;
+use move_model::symbol::Symbol;
 
 pub trait GlobalEnvExt {
     fn get_location_at_offset(
@@ -57,8 +57,12 @@ impl LocExt for move_model::model::Loc {
                     return false;
                 }
 
-                if line == start_line && col < u32::from(start_loc.column) { return false; }
-                if line == end_line && col > u32::from(end_loc.column) { return false; }
+                if line == start_line && col < u32::from(start_loc.column) {
+                    return false;
+                }
+                if line == end_line && col > u32::from(end_loc.column) {
+                    return false;
+                }
 
                 true
             }
@@ -91,12 +95,14 @@ impl SymbolExt for Symbol {
     }
 }
 
-pub(crate) fn numeric_fq_module_name(env: &GlobalEnv, module_ident: ModuleIdent) -> Option<String> {
-    let ModuleIdent_ { address, module } = module_ident.value;
+pub(crate) fn numeric_fq_module_name(
+    env: &GlobalEnv,
+    address: Option<LeadingNameAccess>,
+    module: parser::ast::ModuleName,
+) -> Option<String> {
+    let address = address?;
     let numeric_address = match address.value {
-        LeadingNameAccess_::AnonymousAddress(numeric_address) => {
-            numeric_address.to_string()
-        }
+        LeadingNameAccess_::AnonymousAddress(numeric_address) => numeric_address.to_string(),
         LeadingNameAccess_::Name(named_address) => {
             let sym = env.symbol_pool().make(named_address.value.as_str());
             let Some(addr) = env.resolve_address_alias(sym) else {
@@ -105,7 +111,11 @@ pub(crate) fn numeric_fq_module_name(env: &GlobalEnv, module_ident: ModuleIdent)
             addr.to_standard_string()
         }
     };
-    let target_fq_module_name = format!("{}::{}", numeric_address, &module.0.value.as_str().to_string());
+    let target_fq_module_name = format!(
+        "{}::{}",
+        numeric_address,
+        &module.0.value.as_str().to_string()
+    );
 
     Some(target_fq_module_name)
 }
