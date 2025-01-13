@@ -1,7 +1,9 @@
 use crate::ext::{from_ast_loc, LocExt};
 use move_command_line_common::files::FileHash;
 use move_compiler::diagnostics::Diagnostics;
-use move_compiler::parser::ast::{Definition, LeadingNameAccess, ModuleIdent, ModuleMember, Use};
+use move_compiler::parser::ast::{
+    Definition, LeadingNameAccess, ModuleIdent, ModuleMember, StructLayout, Use,
+};
 use move_compiler::shared::{CompilationEnv, Identifier};
 use move_compiler::{parser, Flags, MatchedFileCommentMap};
 use move_model::model::GlobalEnv;
@@ -27,7 +29,9 @@ pub enum Reference {
         address: Option<LeadingNameAccess>,
         module_name: parser::ast::ModuleName,
     },
-    // todo:
+    TypeRef {
+        type_: parser::ast::Type,
+    },
 }
 
 pub fn find_reference(
@@ -90,9 +94,42 @@ pub fn find_reference(
                     }
                 }
             }
+            ModuleMember::Constant(named_const) => {
+                let const_type = &named_const.signature;
+                if contains_pos(const_type.loc) {
+                    return Some(Reference::TypeRef {
+                        type_: const_type.clone(),
+                    });
+                }
+            }
+            ModuleMember::Struct(struct_) => {
+                let layout = &struct_.layout;
+                match layout {
+                    StructLayout::Singleton(fields, _) => {
+                        for (_, type_) in fields {
+                            if contains_pos(type_.loc) {
+                                return Some(Reference::TypeRef {
+                                    type_: type_.clone(),
+                                });
+                            }
+                        }
+                    }
+                    StructLayout::Variants(variants) => {
+                        for variant in variants {
+                            for (_, type_) in &variant.fields {
+                                if contains_pos(type_.loc) {
+                                    return Some(Reference::TypeRef {
+                                        type_: type_.clone(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    StructLayout::Native(_) => {}
+                }
+            }
             _ => return None,
         }
     }
-
     None
 }

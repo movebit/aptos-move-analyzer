@@ -14,12 +14,11 @@ use itertools::Itertools;
 use lsp_server::*;
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
-use move_compiler::parser::ast::{LeadingNameAccess_, ModuleIdent_};
+use move_compiler::parser::ast::ModuleIdent_;
 use move_compiler::parser::lexer::{Lexer, Tok};
-use move_model::ast::{Address, ModuleName};
 use move_model::{
     ast::{ExpData::*, Operation::*, Pattern as MoveModelPattern, Spec, SpecBlockTarget},
-    model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, ModuleId, NodeId, StructId},
+    model::{FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, StructId},
     symbol::Symbol,
 };
 use std::{
@@ -362,16 +361,6 @@ impl Handler {
                 }
             }
             _ => { return None; }
-            // Reference::Module { address, module_name } => {
-            //     let source_module_fq_name = numeric_fq_module_name(env, address, module_name)?;
-            //     let source_module = env.get_modules().find(|m| {
-            //         m.get_full_name_str().to_lowercase() == source_module_fq_name.to_lowercase()
-            //     })?;
-            //     let captured_item_loc = from_ast_loc(file_id, module_name.loc());
-            //     self.mouse_span = self.get_mouse_loc(env, &captured_item_loc);
-            //     self.insert_result(env, &source_module.get_loc(), &captured_item_loc);
-            //     return None;
-            // }
         }
 
         None
