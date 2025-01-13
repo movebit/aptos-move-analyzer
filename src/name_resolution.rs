@@ -1,18 +1,27 @@
-use crate::ext::LocExt;
-use crate::utils::get_modules_by_fpath_in_all_modules;
-use move_model::ast::{ModuleName, UseDecl};
+use crate::ext::{from_ast_loc, LocExt};
+use move_command_line_common::files::FileHash;
+use move_compiler::diagnostics::Diagnostics;
+use move_compiler::parser::ast::{Definition, ModuleIdent, ModuleMember, Use};
+use move_compiler::shared::CompilationEnv;
+use move_compiler::{parser, Flags, MatchedFileCommentMap};
 use move_model::model::GlobalEnv;
-use std::path::{Path, PathBuf};
+use std::collections::BTreeSet;
 
+fn parse_file_contents(
+    file_contents: &str,
+) -> Result<(Vec<Definition>, MatchedFileCommentMap), Diagnostics> {
+    let mut env = CompilationEnv::new(Flags::empty(), BTreeSet::new());
+    parser::syntax::parse_file_string(&mut env, FileHash::new(file_contents), file_contents)
+}
+
+#[derive(Debug)]
 pub enum Reference {
     UseModule {
-        use_decl: UseDecl,
-        module_name: ModuleName,
+        module_ident: ModuleIdent,
     },
     UseItem {
-        use_decl: UseDecl,
-        item_loc: move_model::model::Loc,
-        item_name: String,
+        module_ident: ModuleIdent,
+        item_name: move_compiler::shared::Name,
     },
     // Function(FunctionEnv<'a>),
     // Struct(StructEnv<'a>),
@@ -20,60 +29,57 @@ pub enum Reference {
 
 pub fn find_reference(
     env: &GlobalEnv,
-    source_fpath: &Path,
-    position: (u32, u32),
+    file_id: codespan::FileId,
+    pos: (u32, u32),
 ) -> Option<Reference> {
-    let fpath = PathBuf::from(source_fpath);
-    let Some(ref_module) = get_modules_by_fpath_in_all_modules(env, &fpath)
-        .into_iter()
-        .find(|m| m.get_loc().contains(&env, position))
-    else {
-        println!("ref is not inside a module");
-        return None;
+    let contains_pos = |loc: move_ir_types::location::Loc| -> bool {
+        from_ast_loc(file_id, loc).contains(env, pos)
     };
 
-    let maybe_use_decl = ref_module
-        .get_use_decls()
+    let file_contents = env.get_file_source(file_id);
+    let (top_level_defs, _comments_map) = parse_file_contents(file_contents).ok()?;
+
+    let module = top_level_defs
         .iter()
-        .find(|u| u.loc.contains(&env, position));
-    if let Some(use_decl) = maybe_use_decl {
-        if use_decl.members.is_empty() {
-            // use 0x1::m;
-            let module_name = use_decl.module_name.clone();
-            return Some(Reference::UseModule {
-                use_decl: use_decl.clone(),
-                module_name,
-            });
-        }
-        for (item_loc, item_sym, _item_alias) in use_decl.members.clone() {
-            if item_loc.contains(&env, position) {
-                return Some(Reference::UseItem {
-                    use_decl: use_decl.clone(),
-                    item_loc,
-                    item_name: item_sym.display(env.symbol_pool()).to_string(),
-                });
+        .filter_map(|def| match def {
+            Definition::Module(module) => Some(module),
+            // todo: only module for now
+            _ => None,
+        })
+        .find(|module| contains_pos(module.loc))?;
+
+    for member in module.members.iter() {
+        match member {
+            ModuleMember::Use(use_decl) => {
+                match &use_decl.use_ {
+                    // todo: don't handle aliases for now
+                    Use::Module(module_ident, _) => {
+                        if contains_pos(module_ident.loc) {
+                            return Some(Reference::UseModule {
+                                module_ident: module_ident.clone(),
+                            });
+                        }
+                    }
+                    Use::Members(module_ident, members) => {
+                        if contains_pos(module_ident.loc) {
+                            return Some(Reference::UseModule {
+                                module_ident: module_ident.clone(),
+                            });
+                        }
+                        for (member_name, _) in members {
+                            if contains_pos(member_name.loc) {
+                                return Some(Reference::UseItem {
+                                    module_ident: module_ident.clone(),
+                                    item_name: member_name.clone(),
+                                });
+                            }
+                        }
+                    }
+                }
             }
+            _ => return None,
         }
     }
-
-    // let maybe_outer_func = ref_module
-    //     .get_functions()
-    //     .find(|f| f.get_loc().contains(&env, position));
-    // if let Some(outer_func) = maybe_outer_func {
-    //     // reference belongs to a function body
-    //     let fun_params = outer_func.get_parameters();
-    //     for (idx, param) in fun_params.iter().enumerate() {
-    //
-    //
-    //     }
-    // }
-
-    // let maybe_struct = ref_module
-    //     .get_structs()
-    //     .find(|f| f.get_loc().contains(&env, position));
-    // if let Some(struct_) = maybe_struct {
-    //     return Some(Reference::Struct(struct_));
-    // }
 
     None
 }

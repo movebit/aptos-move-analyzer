@@ -1,7 +1,8 @@
 // Copyright (c) The BitsLab.Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ext::{GlobalEnvExt, LocExt, SymbolExt};
+use crate::ext::{from_ast_loc, numeric_fq_module_name, GlobalEnvExt, LocExt, SymbolExt};
+use crate::name_resolution::{find_reference, Reference};
 use crate::project::Project;
 use crate::{
     analyzer_handler::*,
@@ -13,6 +14,7 @@ use itertools::Itertools;
 use lsp_server::*;
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
+use move_compiler::parser::ast::{LeadingNameAccess_, ModuleIdent_};
 use move_compiler::parser::lexer::{Lexer, Tok};
 use move_model::ast::{Address, ModuleName};
 use move_model::{
@@ -306,78 +308,61 @@ impl Handler {
         self.result_candidates = res_result_candidates;
     }
 
-    fn process_use_decl(&mut self, env: &GlobalEnv) {
+    fn process_use_decl(&mut self, env: &GlobalEnv) -> Option<()> {
         log::info!("process_use_decl for goto definition");
         let target_module = env.get_module(self.target_module_id);
 
-        let mut target_name = String::default();
-        let mut found_target_use_item = false;
-
         let mouse_position = (self.line, self.col);
 
-        let Some(target_use_decl) = target_module
-            .get_use_decls()
-            .iter()
-            .find(|u| u.loc.contains(&env, mouse_position))
-        else {
-            // cannot find use declaration at pointer position
-            return;
-        };
+        let file_id = target_module.get_loc().file_id();
+        let reference = find_reference(env, file_id, mouse_position)?;
 
-        let module_name = target_use_decl.module_name.clone();
-        let numeric_module_name = match module_name.addr() {
-            Address::Symbolic(sym) => {
-                let Some(addr) = env.resolve_address_alias(*sym) else {
-                    log::error!("could not convert addrname to addrnum, please check you use decl");
-                    return;
-                };
-                ModuleName::new(Address::Numerical(addr), module_name.name())
+        match reference {
+            Reference::UseModule { module_ident } => {
+                let source_module_fq_name = numeric_fq_module_name(env, module_ident)?;
+                let source_module = env.get_modules().find(|m| {
+                    m.get_full_name_str().to_lowercase() == source_module_fq_name.to_lowercase()
+                })?;
+
+                let captured_item_loc = from_ast_loc(file_id, module_ident.loc);
+                self.mouse_span = self.get_mouse_loc(env, &captured_item_loc);
+                self.insert_result(env, &source_module.get_loc(), &captured_item_loc);
+
+                return None;
             }
-            _ => module_name,
-        };
+            Reference::UseItem {
+                module_ident,
+                item_name,
+            } => {
+                let source_module_fq_name = numeric_fq_module_name(env, module_ident)?;
+                let source_module = env.get_modules().find(|m| {
+                    m.get_full_name_str().to_lowercase() == source_module_fq_name.to_lowercase()
+                })?;
 
-        let target_fq_module_name = numeric_module_name.display_full(&env).to_string();
-        let mut capture_items_loc = target_use_decl.loc.clone();
+                let captured_item_loc = from_ast_loc(file_id, item_name.loc);
+                self.mouse_span = self.get_mouse_loc(env, &captured_item_loc);
 
-        if !target_use_decl.members.is_empty() {
-            for (member_loc, name, _alias_name) in target_use_decl.members.clone().into_iter() {
-                if member_loc.contains(&env, mouse_position) {
-                    target_name = name.string(&env);
-                    found_target_use_item = true;
-                    capture_items_loc = member_loc;
-                    break;
+                let target_name = item_name.to_string();
+                if target_name == "Self" {
+                    self.insert_result(env, &source_module.get_loc(), &captured_item_loc);
+                    return None;
                 }
-            }
-        } else {
-            target_name = numeric_module_name.name().string(&env);
-            found_target_use_item = true;
-        }
-
-        let Some(source_module) = env
-            .get_modules()
-            .find(|m| m.get_full_name_str().to_lowercase() == target_fq_module_name.to_lowercase())
-        else {
-            return;
-        };
-
-        self.mouse_span = self.get_mouse_loc(env, &capture_items_loc);
-
-        if found_target_use_item {
-            for struct_ in source_module.get_structs() {
-                if struct_.get_name().string(&env) == target_name {
-                    self.insert_result(env, &struct_.get_loc(), &capture_items_loc);
-                    return;
+                for struct_ in source_module.get_structs() {
+                    if struct_.get_name().string(&env) == target_name {
+                        self.insert_result(env, &struct_.get_loc(), &captured_item_loc);
+                        return None;
+                    }
                 }
-            }
-            for func in source_module.get_functions() {
-                if func.get_name_str() == target_name {
-                    self.insert_result(env, &func.get_loc(), &capture_items_loc);
-                    return;
+                for func in source_module.get_functions() {
+                    if func.get_name_str() == target_name {
+                        self.insert_result(env, &func.get_loc(), &captured_item_loc);
+                        return None;
+                    }
                 }
             }
         }
 
-        self.insert_result(env, &source_module.get_loc(), &capture_items_loc);
+        None
     }
 
     fn process_func(&mut self, env: &GlobalEnv) {
@@ -1308,8 +1293,6 @@ impl Handler {
         result_loc: &move_model::model::Loc,
         capture_loc: &move_model::model::Loc,
     ) {
-        // let capture_line = env.get_location(&capture_loc).unwrap();
-        // if self.line.eq(&capture_line.line.0)
         if capture_loc.span().start() <= self.mouse_span.end()
             && self.mouse_span.end() <= capture_loc.span().end()
         {

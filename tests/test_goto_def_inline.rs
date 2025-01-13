@@ -116,7 +116,6 @@ module std::main {
     "#);
 }
 
-#[ignore = "numeric addresses are not supported"]
 #[test]
 fn test_resolve_function_in_use_stmt_with_numeric_address() {
     // language=Move
@@ -180,7 +179,6 @@ module std::main {
     "#);
 }
 
-#[ignore = "resolution is not implemented for multiline use groups yet"]
 #[test]
 fn test_resolve_module_self_in_use_group_multiline() {
     // language=Move
@@ -197,7 +195,6 @@ module std::main {
     "#);
 }
 
-#[ignore = "resolution is not implemented for multiline use groups yet"]
 #[test]
 fn test_resolve_function_in_use_group_on_separate_line() {
     // language=Move
