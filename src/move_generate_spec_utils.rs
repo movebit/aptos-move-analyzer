@@ -84,7 +84,7 @@ pub fn get_shadows(exp: &MoveModelExp, env: &GlobalEnv, shadows: &mut ShadowItem
             }
         }
         MoveModelExpData::Invoke(_, _, _) => {}
-        MoveModelExpData::Lambda(_, _, _) => {}
+        MoveModelExpData::Lambda(_, _, _, _, _) => {}
         MoveModelExpData::Quant(_, _, _, _, _, _) => {}
         MoveModelExpData::Block(_, p, s, exp) => {
             handle_expdata_block_parren(p, shadows);
@@ -105,7 +105,7 @@ pub fn get_shadows(exp: &MoveModelExp, env: &GlobalEnv, shadows: &mut ShadowItem
             }
         }
         MoveModelExpData::Loop(_, _) => {}
-        MoveModelExpData::LoopCont(_, _) => {}
+        MoveModelExpData::LoopCont(_, _, _) => {}
         MoveModelExpData::Assign(_, _, _) => {}
         MoveModelExpData::Mutate(_, _, _) => {}
         MoveModelExpData::SpecBlock(_, _) => {}

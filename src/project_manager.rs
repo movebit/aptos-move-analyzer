@@ -2,100 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::utils::*;
-use crate::{analyzer_handler::*, project::Project};
+use crate::{analyzer_handler::*, path_utils, project::Project};
 use anyhow::{Ok, Result};
 use codespan_reporting::diagnostic::Severity;
 use codespan_reporting::term::termcolor::Buffer;
-use move_compiler::shared::{NumericalAddress, PackagePaths};
-use move_core_types::account_address::*;
 use move_model::metadata::CompilerVersion;
 use move_model::metadata::LanguageVersion;
 use move_model::model::GlobalEnv;
-use move_model::PackageInfo;
 use move_package::compilation::build_plan::BuildPlan;
 use move_package::source_package::{layout::SourcePackageLayout, manifest_parser::*};
-use num_bigint::BigUint;
 use std::{
     cell::RefCell,
     cmp::Ordering,
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::HashMap,
     path::{Path, PathBuf},
     rc::Rc,
 };
 use tempfile::tempdir;
 use walkdir::WalkDir;
-
-// Determines the base of the number literal, depending on the prefix
-pub(crate) fn determine_num_text_and_base(s: &str) -> (&str, move_compiler::shared::NumberFormat) {
-    for c in s.chars() {
-        if c.is_alphabetic() {
-            return (s, move_compiler::shared::NumberFormat::Hex);
-        }
-    }
-    (s, move_compiler::shared::NumberFormat::Decimal)
-}
-
-// Parse an address from a decimal or hex encoding
-pub fn parse_addr_str_to_number(
-    s: &str,
-) -> Option<(
-    [u8; AccountAddress::LENGTH],
-    move_compiler::shared::NumberFormat,
-)> {
-    let (txt, base) = determine_num_text_and_base(s);
-
-    let parsed = match base {
-        move_compiler::shared::NumberFormat::Hex => BigUint::parse_bytes(txt[2..].as_bytes(), 16),
-        move_compiler::shared::NumberFormat::Decimal => BigUint::parse_bytes(txt.as_bytes(), 10),
-    }?;
-
-    let bytes = parsed.to_bytes_be();
-    if bytes.len() > AccountAddress::LENGTH {
-        return None;
-    }
-    let mut result = [0u8; AccountAddress::LENGTH];
-    result[(AccountAddress::LENGTH - bytes.len())..].clone_from_slice(&bytes);
-    Some((result, base))
-}
-
-pub fn parse_addr_str(s: &str) -> Option<NumericalAddress> {
-    parse_addr_str_to_number(s).map(|(n, format)| NumericalAddress::new(n, format))
-}
-
-pub fn parse_named_address_item(s: &str) -> anyhow::Result<(String, NumericalAddress)> {
-    let before_after = s.split('=').collect::<Vec<_>>();
-
-    if before_after.len() != 2 {
-        anyhow::bail!(
-            "Invalid named address assignment. Must be of the form <address_name>=<address>, but \
-             found '{}'",
-            s
-        );
-    }
-    let name = before_after[0].parse()?;
-    if let Some(addr) = parse_addr_str(before_after[1]) {
-        Ok((name, addr))
-    } else {
-        Ok((
-            name,
-            NumericalAddress::new(
-                AccountAddress::from_hex_literal("0x0")
-                    .unwrap()
-                    .into_bytes(),
-                move_compiler::shared::NumberFormat::Hex,
-            ),
-        ))
-    }
-}
-
-pub fn parse_addresses_from_options(
-    named_addr_strings: Vec<String>,
-) -> anyhow::Result<BTreeMap<String, NumericalAddress>> {
-    named_addr_strings
-        .iter()
-        .map(|x| parse_named_address_item(x))
-        .collect()
-}
 
 impl Project {
     pub(crate) fn mk_multi_project_key(&self) -> im::HashSet<PathBuf> {
@@ -109,124 +33,6 @@ impl Project {
 
     pub fn load_ok(&self) -> bool {
         self.manifest_not_exists.is_empty() && self.manifest_load_failures.is_empty()
-    }
-
-    #[allow(dead_code)]
-    fn get_global_env_by_move_package_v1(
-        &mut self,
-        report_err: impl FnMut(String) + Clone,
-        pkg_path: &Path,
-    ) {
-        let mut targets_paths: Vec<PathBuf> = Vec::new();
-        let mut dependents_paths: Vec<PathBuf> = Vec::new();
-        self.load_project(
-            &pkg_path,
-            report_err,
-            true,
-            &mut targets_paths,
-            &mut dependents_paths,
-        )
-        .unwrap_or_default();
-        log::info!("targets_paths.len() = {:?}", targets_paths.len());
-        log::info!("dependents_paths.len() = {:?}", dependents_paths.len());
-        let build_config = move_package::BuildConfig {
-            test_mode: true,
-            install_dir: Some(tempdir().unwrap().path().to_path_buf()),
-            skip_fetch_latest_git_deps: true,
-            ..Default::default()
-        };
-        let resolution_graph = build_config
-            .resolution_graph_for_package(&pkg_path, &mut Vec::new())
-            .unwrap();
-        let named_address_mapping: Vec<_> = resolution_graph
-            .extract_named_address_mapping()
-            .map(|(name, addr)| format!("{}={}", name.as_str(), addr))
-            .collect();
-        let addrs = parse_addresses_from_options(named_address_mapping.clone()).unwrap_or_default();
-
-        let targets = vec![PackagePaths {
-            name: None,
-            paths: targets_paths
-                .clone()
-                .into_iter()
-                .map(|p| p.to_string_lossy().to_string())
-                .collect::<Vec<_>>(),
-            named_address_map: addrs.clone(),
-        }];
-
-        let dependents = vec![PackagePaths {
-            name: None,
-            paths: dependents_paths
-                .clone()
-                .into_iter()
-                .map(|p| p.to_string_lossy().to_string())
-                .collect::<Vec<_>>(),
-            named_address_map: addrs.clone(),
-        }];
-
-        let attributes: BTreeSet<String> = Default::default();
-        self.targets = targets.clone();
-        self.dependents = dependents.clone();
-        {
-            let addrs = move_model::parse_addresses_from_options(named_address_mapping.clone())
-                .unwrap_or_default();
-            self.global_env = move_model::run_model_builder_in_compiler_mode(
-                PackageInfo {
-                    sources: targets_paths
-                        .clone()
-                        .into_iter()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .collect::<Vec<_>>(),
-                    address_map: addrs.clone(),
-                },
-                PackageInfo {
-                    sources: vec![],
-                    address_map: addrs.clone(),
-                },
-                vec![PackageInfo {
-                    sources: dependents_paths
-                        .clone()
-                        .into_iter()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .collect::<Vec<_>>(),
-                    address_map: addrs.clone(),
-                }],
-                true,
-                &attributes,
-                LanguageVersion::V2_1,
-                false,
-                false,
-                true,
-                true,
-            )
-            .unwrap_or_default();
-
-            // // Store address aliases
-            // let map = addrs
-            //     .into_iter()
-            //     .map(|(s, a)| (env.symbol_pool().make(&s), a.into_inner()))
-            //     .collect();
-            // env.set_address_alias_map(map);
-        }
-
-        log::info!(
-            "env.get_module_count() = {:?}",
-            &self.global_env.get_module_count()
-        );
-        let mut error_writer = Buffer::no_color();
-
-        let mut helper = HashMap::new();
-        for (addr_name, addr_num) in addrs.iter() {
-            helper.insert(addr_name.clone(), addr_num.to_string());
-        }
-
-        self.addrname_2_addrnum = helper;
-        self.global_env
-            .report_diag(&mut error_writer, Severity::Error);
-        self.err_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-        if self.err_diags.len() > 0 {
-            log::error!("global_env's err_diags = \n{}", self.err_diags);
-        }
     }
 
     fn get_global_env_by_move_package_v2(&mut self, pkg_path: &Path) -> Result<GlobalEnv> {
@@ -252,77 +58,37 @@ impl Project {
         let (_, env) = build_plan.compile_with_driver(
             &mut std::io::sink(),
             &compile_cfg,
+            vec![],
             |_compiler| Ok(Default::default()),
             |compile_option| {
                 let addrs = move_model::parse_addresses_from_options(
                     compile_option.named_address_mapping.clone(),
                 )?;
-                // log::info!("\n*******************************************\n\n addrs = \n{:?}", addrs);
-                // log::info!("\n*******************************************\n\n sources = \n{:?}", compile_option.sources);
-                // log::info!(
-                //     "\n*******************************************\n\n sources = \n{:?}",
-                //     compile_option.sources_deps
-                // );
-                let mut src_dep_paths = vec![];
-                let mut dep_paths = vec![];
-                for dep_path in &compile_option.sources_deps {
-                    if dep_path.split('/').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.split('\\').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.contains("/tests/")
-                        || dep_path.contains("/tests\\")
-                        || dep_path.contains(r"/tests\\")
-                        || dep_path.contains(r"\\tests\\")
-                    {
-                        continue;
-                    }
-                    src_dep_paths.push(dep_path.clone());
-                }
-                for dep_path in &compile_option.dependencies {
-                    if dep_path.split('/').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.split('\\').find(|&x| x == "tests").is_some() {
-                        continue;
-                    }
-                    if dep_path.contains("/tests/")
-                        || dep_path.contains("/tests\\")
-                        || dep_path.contains(r"/tests\\")
-                        || dep_path.contains(r"\\tests\\")
-                    {
-                        continue;
-                    }
-                    dep_paths.push(dep_path.clone());
-                }
                 let mut helper = HashMap::new();
                 for (addr_name, addr_num) in addrs.iter() {
                     helper.insert(addr_name.clone(), addr_num.to_string());
                 }
                 self.addrname_2_addrnum = helper;
-                let env = move_model::run_model_builder_in_compiler_mode(
-                    PackageInfo {
-                        sources: compile_option.sources,
-                        address_map: addrs.clone(),
-                    },
-                    PackageInfo {
-                        sources: src_dep_paths,
-                        address_map: addrs.clone(),
-                    },
-                    vec![PackageInfo {
-                        sources: dep_paths,
-                        address_map: addrs.clone(),
-                    }],
-                    true,
-                    &Default::default(),
-                    LanguageVersion::V2_1,
-                    false,
-                    false,
-                    true,
-                    true,
-                )?;
+
+                let no_tests_source_deps = compile_option
+                    .sources_deps
+                    .iter()
+                    .filter(|dep| path_utils::has_path_component_with_name(&dep.into(), "tests"))
+                    .map(|dep| dep.to_owned())
+                    .collect::<Vec<_>>();
+                let no_tests_dependencies = compile_option
+                    .dependencies
+                    .iter()
+                    .filter(|dep| path_utils::has_path_component_with_name(&dep.into(), "tests"))
+                    .map(|dep| dep.to_owned())
+                    .collect::<Vec<_>>();
+                let no_tests_compiler_options = move_compiler_v2::Options {
+                    sources_deps: no_tests_source_deps,
+                    dependencies: no_tests_dependencies,
+                    ..compile_option
+                };
+                let env = move_compiler_v2::run_checker(no_tests_compiler_options)?;
+
                 self.global_env = env;
                 log::info!(
                     "self.global_env.get_module_count() = {:?}",

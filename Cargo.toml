@@ -25,14 +25,14 @@ tempfile = "3.2.0"
 url = "2.2.2"
 clap = { version = "3.1.8", features = ["derive"] }
 crossbeam = "0.8"
-move-model = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-model" }
-move-command-line-common = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-command-line-common" }
-move-compiler = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-compiler" }
-move-ir-types = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-ir-types" }
-move-package = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-package" }
-move-symbol-pool = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-symbol-pool" }
-move-core-types = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-core-types" }
-move-cli = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model", package = "move-cli" }
+move-model = { git = "https://github.com/mkurnikov/aptos-core.git", rev = "f52bb20a5a49db9da4d5fd8dd9d9f4df908593ff", package = "move-model" }
+move-command-line-common = { git = "https://github.com/mkurnikov/aptos-core.git", rev = "f52bb20a5a49db9da4d5fd8dd9d9f4df908593ff", package = "move-command-line-common" }
+move-compiler = { git = "https://github.com/mkurnikov/aptos-core.git", rev = "f52bb20a5a49db9da4d5fd8dd9d9f4df908593ff", package = "move-compiler" }
+move-compiler_v2 = { git = "https://github.com/mkurnikov/aptos-core.git", rev = "f52bb20a5a49db9da4d5fd8dd9d9f4df908593ff", package = "move-compiler-v2" }
+move-ir-types = { git = "https://github.com/mkurnikov/aptos-core.git", rev = "f52bb20a5a49db9da4d5fd8dd9d9f4df908593ff", package = "move-ir-types" }
+move-package = { git = "https://github.com/mkurnikov/aptos-core.git", rev = "f52bb20a5a49db9da4d5fd8dd9d9f4df908593ff", package = "move-package" }
+move-symbol-pool = { git = "https://github.com/mkurnikov/aptos-core.git", rev = "f52bb20a5a49db9da4d5fd8dd9d9f4df908593ff", package = "move-symbol-pool" }
+move-core-types = { git = "https://github.com/mkurnikov/aptos-core.git", rev = "f52bb20a5a49db9da4d5fd8dd9d9f4df908593ff", package = "move-core-types" }
 movefmt = { git = "https://github.com/movebit/movefmt.git", branch = "develop" }
 commentfmt = { git = "https://github.com/movebit/movefmt.git", branch = "develop", package = "commentfmt" }
 itertools = "0.10.0"
