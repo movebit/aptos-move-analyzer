@@ -296,7 +296,7 @@ impl Handler {
         self.result_candidates = res_result_candidates;
     }
 
-    fn process_use_decl(&mut self, env: &GlobalEnv) {
+    fn process_use_decl(&mut self, env: &GlobalEnv) -> Option<()> {
         log::info!("process_use_decl for goto definition");
         let target_module = env.get_module(self.target_module_id);
         let spool = env.symbol_pool();
@@ -356,31 +356,13 @@ impl Handler {
         }
 
         if !found_target_stct_or_fn && !found_usedecl_same_line {
-            return;
+            return None;
         }
 
-        let mut option_use_module: Option<ModuleEnv<'_>> = None;
-        for mo_env in env.get_modules() {
-            let mo_name_str = mo_env.get_name().display_full(env).to_string();
-            log::info!(
-                "addrnum_with_module_name = {:?}, mo_name_str = {:?}",
-                addrnum_with_module_name,
-                mo_name_str
-            );
-            if addrnum_with_module_name.len() != mo_name_str.len() {
-                continue;
-            }
-
-            if mo_name_str.to_lowercase() == addrnum_with_module_name.to_lowercase() {
-                option_use_module = Some(mo_env);
-                break;
-            }
-        }
-
-        let use_decl_module = match option_use_module {
-            Some(x) => x,
-            None => return,
-        };
+        let use_decl_module = env.get_modules().find(|m| {
+            m.get_full_name_str()
+                .eq_ignore_ascii_case(&addrnum_with_module_name)
+        })?;
 
         self.get_mouse_loc(env, &capture_items_loc);
         if found_target_stct_or_fn {
@@ -398,7 +380,7 @@ impl Handler {
                         env.get_source(&capture_items_loc)
                     );
                     self.insert_result(env, &stct.get_loc(), &capture_items_loc);
-                    return;
+                    return Some(());
                 }
             }
             for func in use_decl_module.get_functions() {
@@ -414,15 +396,17 @@ impl Handler {
                         env.get_source(&capture_items_loc)
                     );
                     self.insert_result(env, &func.get_loc(), &capture_items_loc);
-                    return;
+                    return Some(());
                 }
             }
         }
 
         if found_usedecl_same_line {
             log::info!("find use decl module...");
-            self.insert_result(env, &use_decl_module.get_loc(), &capture_items_loc)
+            self.insert_result(env, &use_decl_module.get_loc(), &capture_items_loc);
         }
+
+        Some(())
     }
 
     fn process_func(&mut self, env: &GlobalEnv) {
