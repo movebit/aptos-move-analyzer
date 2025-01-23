@@ -85,11 +85,10 @@ mod tests {
             "generate_spec_file_request_001".to_string().into(),
             serde_json::to_value(ex).unwrap(),
         );
-        // // std::thread::sleep(Duration::new(1, 0));
-        // log::info!("\n------------------------------\n");
+        log::info!("\n------------------------------\n");
         eprintln!("actual_r = {:?}", actual_r.result);
         eprintln!("\n\n\n");
-        // log::trace!("expect_r = {:?}", expect_r);
+        log::trace!("expect_r = {:?}", expect_r);
         log::info!("\n------------------------------\n");
         assert_eq!(actual_r.result, expect_r.result);
     }
@@ -135,11 +134,10 @@ mod tests {
             "generate_spec_file_request_002".to_string().into(),
             serde_json::to_value(ex).unwrap(),
         );
-        // // std::thread::sleep(Duration::new(1, 0));
-        // log::info!("\n------------------------------\n");
+        log::info!("\n------------------------------\n");
         eprintln!("actual_r = {:?}", actual_r.result);
         eprintln!("\n\n\n");
-        // log::trace!("expect_r = {:?}", expect_r);
+        log::trace!("expect_r = {:?}", expect_r);
         log::info!("\n------------------------------\n");
         assert_eq!(actual_r.result, expect_r.result);
     }

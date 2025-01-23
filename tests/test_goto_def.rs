@@ -92,7 +92,7 @@ mod tests {
             json!([{
                 "range":{
                     "end":{
-                        "character":12,
+                        "character":22,
                         "line":187
                     },
                     "start":{
@@ -158,7 +158,7 @@ mod tests {
             json!([{
                 "range":{
                     "end":{
-                        "character":29,
+                        "character":72,
                         "line":48
                     },
                     "start":{
@@ -228,7 +228,7 @@ mod tests {
                     },
                     "end":{
                         "line":228,
-                        "character":42,
+                        "character":576,
                     },
                 },
                 "uri": "file://".to_string() + fpath.to_str().unwrap()
@@ -293,7 +293,7 @@ mod tests {
                     },
                     "end":{
                         "line":140,
-                        "character":4,
+                        "character":40,
                     },
                 },
                 "uri": "file://".to_string() + fpath.to_str().unwrap()
@@ -358,7 +358,7 @@ mod tests {
                     },
                     "end":{
                         "line":35,
-                        "character":42,
+                        "character":597,
                     },
                 },
                 "uri":
@@ -428,7 +428,7 @@ mod tests {
                     },
                     "end":{
                         "line":1,
-                        "character":4,
+                        "character":58,
                     },
                 },
                 "uri":

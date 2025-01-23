@@ -330,7 +330,7 @@ mod tests {
         let expect_r = Response::new_ok(
             "test_hover_006".to_string().into(),
             json!({
-                    "contents": "account::SignerCapability"
+                    "contents": "0x1::account::SignerCapability"
                 }
             ),
         );
