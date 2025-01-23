@@ -62,13 +62,10 @@ where
     let mut addr_num_and_module_name_to_addr_name: HashMap<(String, String), String> =
         Default::default();
     env.get_modules().for_each(|module| {
-        if let move_model::ast::Address::Symbolic(sym) = module.self_address() {
+        if let move_model::ast::Address::Numerical(addr) = module.self_address() {
             let module_name = module.get_name().display(&env).to_string();
-            if let Some(addr) = env.resolve_address_alias(*sym) {
-                let k = (addr.to_standard_string(), module_name);
-                let addr_name = env.symbol_pool().string(*sym);
-                addr_num_and_module_name_to_addr_name.insert(k, addr_name.to_string());
-            }
+            let k = (addr.to_standard_string(), module_name.clone());
+            addr_num_and_module_name_to_addr_name.insert(k, addr.to_standard_string());
         }
     });
 
@@ -81,21 +78,18 @@ where
 
         log::info!("generate spec module: {}", module_env.get_full_name_str());
         // find module_env's namespace
-        let module_env_full_name = module_env.get_full_name_str();
-        let mut split_iter = module_env_full_name.split("::");
-        if split_iter.clone().count() != 2 {
-            log::error!("module full name's len should be 2");
+        let mut k = ("".to_string(), "".to_string());
+        if let move_model::ast::Address::Numerical(addr) = module_env.self_address() {
+            let module_name = module_env.get_name().display(&env).to_string();
+            k = (addr.to_standard_string(), module_name.clone());
+        } else {
             continue;
         }
-
-        let a = split_iter.next().unwrap();
-        let b = split_iter.next().unwrap();
-        let c = (a.to_string().to_uppercase(), b.to_string());
-        if addr_num_and_module_name_to_addr_name.get(&c).is_none() {
-            log::error!("cound not found address number for {:?}", c);
+        if addr_num_and_module_name_to_addr_name.get(&k).is_none() {
+            log::error!("cound not found address number for {:?}", k);
             continue;
         }
-        let addr_name = addr_num_and_module_name_to_addr_name.get(&c).unwrap();
+        let addr_name = addr_num_and_module_name_to_addr_name.get(&k).unwrap();
         let module_name = module_env.get_name().display(env).to_string();
 
         // find all available StructEnv and FunctionEnv
@@ -120,7 +114,6 @@ where
             .collect();
 
         env_item_list.sort_by(|a, b| a.line.cmp(&b.line));
-
         for item in env_item_list {
             let spec = match item {
                 EnvItem {
