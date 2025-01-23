@@ -54,4 +54,5 @@ pub mod movefmt;
 pub mod symbols;
 pub mod type_display_for_spec;
 
+pub(crate) mod ext;
 pub(crate) mod path_utils;

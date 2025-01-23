@@ -1,6 +1,7 @@
 // Copyright (c) The BitsLab.Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::ext::{GlobalEnvExt, SymbolExt};
 use crate::project::Project;
 use crate::{
     analyzer_handler::*,
@@ -117,17 +118,9 @@ impl Handler {
         env: &GlobalEnv,
         loc: &move_model::model::Loc,
     ) -> bool {
-        if let Some(obj_first_col) = env.get_location(&move_model::model::Loc::new(
-            loc.file_id(),
-            codespan::Span::new(
-                loc.span().start(),
-                loc.span().start() + codespan::ByteOffset(1),
-            ),
-        )) {
-            if let Some(obj_last_col) = env.get_location(&move_model::model::Loc::new(
-                loc.file_id(),
-                codespan::Span::new(loc.span().end(), loc.span().end() + codespan::ByteOffset(1)),
-            )) {
+        if let Some(obj_first_col) = env.get_location_at_offset(loc.file_id(), loc.span().start()) {
+            if let Some(obj_last_col) = env.get_location_at_offset(loc.file_id(), loc.span().end())
+            {
                 if u32::from(obj_first_col.line) == self.line
                     && u32::from(obj_first_col.column) <= self.col
                     && self.col <= u32::from(obj_last_col.column)
@@ -324,7 +317,7 @@ impl Handler {
                 addr
             }
         };
-        let module_name = use_decl.module_name.name().display(spool).to_string();
+        let module_name = use_decl.module_name.name().to_string(env);
 
         addrnum_with_module_name = format!(
             "{}::{}",
@@ -340,7 +333,7 @@ impl Handler {
                 .iter()
                 .find(|(m_loc, _, _)| self.check_move_model_loc_contains_mouse_pos(env, m_loc));
             if let Some((m_loc, m_name, _)) = maybe_member.cloned() {
-                target_stct_or_fn = m_name.display(spool).to_string();
+                target_stct_or_fn = m_name.to_string(env);
                 found_target_stct_or_fn = true;
                 capture_items_loc = m_loc;
                 log::info!("find use decl member {}", target_stct_or_fn);
