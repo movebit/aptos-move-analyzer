@@ -90,7 +90,7 @@ impl Project {
                     )
                     .map(|dep| dep.to_owned())
                     .collect::<Vec<_>>();
-                let env = move_model::run_model_builder_in_compiler_mode(
+                let mut env = move_model::run_model_builder_in_compiler_mode(
                     move_model::PackageInfo {
                         sources: compile_option.sources,
                         address_map: addrs.clone(),
@@ -111,6 +111,14 @@ impl Project {
                     true,
                     false,
                 )?;
+
+                // Store address aliases
+                let map = addrs
+                    .into_iter()
+                    .map(|(s, a)| (env.symbol_pool().make(&s), a.into_inner()))
+                    .collect();
+                env.set_address_alias_map(map);
+
                 self.global_env = env;
                 log::info!(
                     "self.global_env.get_module_count() = {:?}",
