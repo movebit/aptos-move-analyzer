@@ -336,15 +336,15 @@ impl Handler {
             capture_items_loc = use_decl.loc.clone();
 
             if !use_decl.members.is_empty() {
-                for (member_loc, name, _alias_name) in use_decl.members.clone().into_iter() {
-                    log::info!("member_loc = {:?} ---", env.get_location(&member_loc));
-                    if self.check_move_model_loc_contains_mouse_pos(env, &member_loc) {
-                        target_stct_or_fn = name.display(spool).to_string();
-                        found_target_stct_or_fn = true;
-                        capture_items_loc = member_loc;
-                        log::info!("find use decl member {}", target_stct_or_fn);
-                        break;
-                    }
+                let maybe_member = use_decl
+                    .members
+                    .iter()
+                    .find(|(m_loc, _, _)| self.check_move_model_loc_contains_mouse_pos(env, m_loc));
+                if let Some((m_loc, m_name, _)) = maybe_member.cloned() {
+                    target_stct_or_fn = m_name.display(spool).to_string();
+                    found_target_stct_or_fn = true;
+                    capture_items_loc = m_loc;
+                    log::info!("find use decl member {}", target_stct_or_fn);
                 }
             } else {
                 target_stct_or_fn = module_name.to_string();
