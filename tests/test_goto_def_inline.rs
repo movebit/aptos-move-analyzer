@@ -91,7 +91,7 @@ mod tests {
         test_resolve_reference(r#"
     module std::m {
         public fun call() {}
-                //X
+                   //X
     }
     module std::main {
         use std::m::call;
@@ -109,7 +109,7 @@ mod tests {
         test_resolve_reference(r#"
     module std::m {
         public fun call() {}
-                //X
+                   //X
     }
     module std::main {
         use std::m::call;
@@ -125,7 +125,7 @@ mod tests {
         test_resolve_reference(r#"
     module 0x1::m {
         public fun call() {}
-                //X
+                  //X
     }
     module 0x1::main {
         use 0x1::m::call;
@@ -141,7 +141,7 @@ mod tests {
         test_resolve_reference(r#"
     module std::m {
         public fun call() {}
-                //X
+                   //X
     }
     module std::main {
         fun main() {
@@ -158,7 +158,7 @@ mod tests {
         test_resolve_reference(r#"
     module std::m {
         public fun call() {}
-                //X
+                   //X
     }
     module std::main {
         use std::m::{call};
@@ -172,7 +172,7 @@ mod tests {
         // language=Move
         test_resolve_reference(r#"
     module std::m {
-            //X
+              //X
         public fun call() {}
     }
     module std::main {
@@ -188,7 +188,7 @@ mod tests {
         // language=Move
         test_resolve_reference(r#"
     module std::m {
-            //X
+              //X
         public fun call() {}
     }
     module std::main {
@@ -206,12 +206,12 @@ mod tests {
         test_resolve_reference(r#"
     module std::m {
         public fun call() {}
-                //X
+                  //X
     }
     module std::main {
         use std::m::{
             call
-        //^
+          //^
         };
     }
         "#);
@@ -223,11 +223,11 @@ mod tests {
         test_resolve_reference(r#"
     module std::m {
         struct S { val: u8 }
-            //X
+             //X
     }
     module std::main {
         use std::m::S;
-                //^
+                  //^
     }
         "#);
     }
@@ -238,9 +238,9 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         struct S { val: u8 }
-            //X
+             //X
         fun main(): S {
-                //^
+                  //^
         }
     }
         "#);
@@ -252,12 +252,12 @@ mod tests {
         test_resolve_reference(r#"
     module std::m {
         struct S { val: u8 }
-            //X
+             //X
     }
     module std::main {
         use std::m::S;
         fun main(): S {
-                //^
+                  //^
         }
     }
         "#);
@@ -270,9 +270,9 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         struct S { val: u8 }
-            //X
+             //X
         fun main(): S {}
-                //^
+                  //^
     }
         "#);
     }
@@ -283,10 +283,10 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         struct S { val: u8 }
-            //X
+             //X
         fun main() {
             S { val: 1 };
-        //^
+          //^
         }
     }
         "#);
@@ -299,10 +299,10 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         struct S { val: u8 }
-            //X
+             //X
         fun main() {
             S { val: 1 }; }
-        //^
+          //^
     }
         "#);
     }
@@ -313,9 +313,9 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         struct S { val: u8 }
-            //X
+             //X
         fun main(s: S) {
-                //^
+                  //^
         }
     }
         "#);
@@ -327,9 +327,9 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         fun main(s: u8) {
-            //X
+               //X
             s;
-        //^
+          //^
         }
     }
         "#);
@@ -342,9 +342,9 @@ mod tests {
     module std::main {
         fun main() {
             let s = 1;
-            //X
+              //X
             s;
-        //^
+          //^
         }
     }
         "#);
@@ -357,9 +357,9 @@ mod tests {
     module std::main {
         fun main(s: u8) {
             let s = 1;
-            //X
+              //X
             s;
-        //^
+          //^
         }
     }
         "#);
@@ -373,9 +373,9 @@ mod tests {
         fun main(s: u8) {
             let s = 1;
             let s = 2;
-            //X
+              //X
             s;
-        //^
+          //^
         }
     }
         "#);
@@ -387,7 +387,7 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         struct S { val: u8 }
-                //X
+                  //X
         fun main() {
             S { val: 1 }
                 //^
@@ -402,10 +402,10 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         struct S { val: u8 }
-                //X
+                  //X
         fun main(s: S) {
             let S { val: myval } = s;
-                //^
+                  //^
         }
     }
         "#);
@@ -417,11 +417,11 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         struct S { val: u8 }
-                //X
+                  //X
         fun main() {
             let s = S { val: 1 };
             s.val;
-            //^
+              //^
         }
     }
         "#);
@@ -433,10 +433,10 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         const MY_ERR: u8 = 1;
-            //X
+              //X
         fun main() {
             MY_ERR;
-        //^
+            //^
         }
     }
         "#);
@@ -447,11 +447,11 @@ mod tests {
         // language=Move
         test_resolve_reference(r#"
     module std::m {
-            //X
+              //X
     }
     module std::main {
         use std::m;
-            //^
+               //^
     }
         "#);
     }
@@ -461,12 +461,12 @@ mod tests {
         // language=Move
         test_resolve_reference(r#"
     module std::m {
-            //X
+              //X
         public fun call() {}
     }
     module std::main {
         use std::m::call;
-            //^
+               //^
     }
         "#);
     }
@@ -477,14 +477,14 @@ mod tests {
         // language=Move
         test_resolve_reference(r#"
     module std::m {
-            //X
+              //X
         public fun call() {}
     }
     module std::main {
         use std::m;
         fun main() {
             m::call();
-        //^
+          //^
         }
     }
         "#);
@@ -496,14 +496,14 @@ mod tests {
         // language=Move
         test_resolve_reference(r#"
     module std::m {
-            //X
+              //X
         public fun call() {}
     }
     module std::main {
         use std::m::Self;
         fun main() {
             m::call();
-        //^
+          //^
         }
     }
         "#);
@@ -515,13 +515,13 @@ mod tests {
         test_resolve_reference(r#"
     module std::m {
         public fun call() {}
-                //X
+                  //X
     }
     module std::main {
         use std::m;
         fun main() {
             m::call();
-            //^
+              //^
         }
     }
         "#);
@@ -533,13 +533,13 @@ mod tests {
         test_resolve_reference(r#"
     module std::m {
         public fun call() {}
-                //X
+                  //X
     }
     module std::main {
         use std::m::Self;
         fun main() {
             m::call();
-            //^
+              //^
         }
     }
         "#);
@@ -551,7 +551,7 @@ mod tests {
         // language=Move
         test_resolve_reference(r#"
     module 0x1::m {
-            //X
+              //X
     }
     spec 0x1::m {
             //^
@@ -582,11 +582,11 @@ mod tests {
         test_resolve_reference(r#"
     module 0x1::m {
         struct S { val: u8 }
-            //X
+             //X
     }
     spec 0x1::m {
         spec S {}
-        //^
+           //^
     }
         "#)
     }
@@ -598,12 +598,12 @@ mod tests {
         test_resolve_reference(r#"
     module 0x1::m {
         fun main() {}
-        //X
+           //X
     }
     spec 0x1::m {
         spec main {
             main();
-        //^
+           //^
         }
     }
         "#)
@@ -616,12 +616,12 @@ mod tests {
         test_resolve_reference(r#"
     module 0x1::m {
         fun call() {}
-        //X
+          //X
         public fun main() {
         }
         spec main {
             call();
-        //^
+           //^
         }
     }
         "#)
