@@ -302,7 +302,7 @@ impl Handler {
         let use_decl = target_module
             .get_use_decls()
             .iter()
-            .find(|us| self.check_move_model_loc_contains_mouse_pos(env, &us.loc))?;
+            .find(|us| us.loc.contains(env, (self.line, self.col)))?;
 
         let use_pos = env.get_location(&use_decl.loc).unwrap();
         log::info!("find use decl module, line: {}", use_pos.line);

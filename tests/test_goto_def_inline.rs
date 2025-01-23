@@ -189,7 +189,6 @@ mod tests {
         "#);
     }
 
-    #[ignore = "not implemented yet"]
     #[test]
     fn test_resolve_module_self_in_use_group_multiline() {
         // language=Move
@@ -206,7 +205,6 @@ mod tests {
         "#);
     }
 
-    #[ignore = "not implemented yet"]
     #[test]
     fn test_resolve_function_in_use_group_on_separate_line() {
         // language=Move
