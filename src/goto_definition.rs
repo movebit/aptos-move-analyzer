@@ -306,57 +306,50 @@ impl Handler {
         let mut capture_items_loc = move_model::model::Loc::default();
         let mut addrnum_with_module_name = Default::default();
 
-        for use_decl in target_module.get_use_decls() {
-            if !self.check_move_model_loc_contains_mouse_pos(env, &use_decl.loc) {
-                continue;
-            }
-            let use_pos = env.get_location(&use_decl.loc).unwrap();
-            log::info!("find use decl module, line: {}", use_pos.line);
+        let use_decl = target_module
+            .get_use_decls()
+            .iter()
+            .find(|us| self.check_move_model_loc_contains_mouse_pos(env, &us.loc))?;
 
-            let numeric_module_addr = match use_decl.module_name.addr() {
-                Address::Numerical(addr) => addr.to_owned(),
-                Address::Symbolic(sym) => {
-                    let Some(addr) = env.resolve_address_alias(*sym) else {
-                        log::error!(
+        let use_pos = env.get_location(&use_decl.loc).unwrap();
+        log::info!("find use decl module, line: {}", use_pos.line);
+
+        let numeric_module_addr = match use_decl.module_name.addr() {
+            Address::Numerical(addr) => addr.to_owned(),
+            Address::Symbolic(sym) => {
+                let Some(addr) = env.resolve_address_alias(*sym) else {
+                    log::error!(
                             "could not convert addrname to addrnum, please check you use decl"
                         );
-                        continue;
-                    };
-                    addr
-                }
-            };
-            let module_name = use_decl.module_name.name().display(spool).to_string();
+                    return None;
+                };
+                addr
+            }
+        };
+        let module_name = use_decl.module_name.name().display(spool).to_string();
 
-            addrnum_with_module_name = format!(
-                "{}::{}",
-                numeric_module_addr.to_standard_string(),
-                module_name.clone()
-            );
-            found_usedecl_same_line = true;
-            capture_items_loc = use_decl.loc.clone();
+        addrnum_with_module_name = format!(
+            "{}::{}",
+            numeric_module_addr.to_standard_string(),
+            module_name.clone()
+        );
+        found_usedecl_same_line = true;
+        capture_items_loc = use_decl.loc.clone();
 
-            if !use_decl.members.is_empty() {
-                let maybe_member = use_decl
-                    .members
-                    .iter()
-                    .find(|(m_loc, _, _)| self.check_move_model_loc_contains_mouse_pos(env, m_loc));
-                if let Some((m_loc, m_name, _)) = maybe_member.cloned() {
-                    target_stct_or_fn = m_name.display(spool).to_string();
-                    found_target_stct_or_fn = true;
-                    capture_items_loc = m_loc;
-                    log::info!("find use decl member {}", target_stct_or_fn);
-                }
-            } else {
-                target_stct_or_fn = module_name.to_string();
+        if !use_decl.members.is_empty() {
+            let maybe_member = use_decl
+                .members
+                .iter()
+                .find(|(m_loc, _, _)| self.check_move_model_loc_contains_mouse_pos(env, m_loc));
+            if let Some((m_loc, m_name, _)) = maybe_member.cloned() {
+                target_stct_or_fn = m_name.display(spool).to_string();
                 found_target_stct_or_fn = true;
+                capture_items_loc = m_loc;
+                log::info!("find use decl member {}", target_stct_or_fn);
             }
-            if found_target_stct_or_fn {
-                break;
-            }
-        }
-
-        if !found_target_stct_or_fn && !found_usedecl_same_line {
-            return None;
+        } else {
+            target_stct_or_fn = module_name.to_string();
+            found_target_stct_or_fn = true;
         }
 
         let use_decl_module = env.get_modules().find(|m| {
