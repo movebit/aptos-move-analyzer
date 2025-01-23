@@ -73,22 +73,44 @@ impl Project {
                 let no_tests_source_deps = compile_option
                     .sources_deps
                     .iter()
-                    .filter(|dep| path_utils::has_path_component_with_name(&dep.into(), "tests"))
+                    .filter(|dep| 
+                        (path_utils::has_path_component_with_name(&dep.into(), "aptos-move") &&
+                        !path_utils::has_path_component_with_name(&dep.into(), "tests")) ||
+                        !path_utils::has_path_component_with_name(&dep.into(), "aptos-move")
+                    )
                     .map(|dep| dep.to_owned())
                     .collect::<Vec<_>>();
                 let no_tests_dependencies = compile_option
                     .dependencies
                     .iter()
-                    .filter(|dep| path_utils::has_path_component_with_name(&dep.into(), "tests"))
+                    .filter(|dep| 
+                        (path_utils::has_path_component_with_name(&dep.into(), "aptos-move") &&
+                        !path_utils::has_path_component_with_name(&dep.into(), "tests")) ||
+                        !path_utils::has_path_component_with_name(&dep.into(), "aptos-move")
+                    )
                     .map(|dep| dep.to_owned())
                     .collect::<Vec<_>>();
-                let no_tests_compiler_options = move_compiler_v2::Options {
-                    sources_deps: no_tests_source_deps,
-                    dependencies: no_tests_dependencies,
-                    ..compile_option
-                };
-                let env = move_compiler_v2::run_checker(no_tests_compiler_options)?;
-
+                let env = move_model::run_model_builder_in_compiler_mode(
+                    move_model::PackageInfo {
+                        sources: compile_option.sources,
+                        address_map: addrs.clone(),
+                    },
+                    move_model::PackageInfo {
+                        sources: no_tests_source_deps,
+                        address_map: addrs.clone(),
+                    },
+                    vec![move_model::PackageInfo {
+                        sources: no_tests_dependencies,
+                        address_map: addrs.clone(),
+                    }],
+                    true,
+                    &Default::default(),
+                    LanguageVersion::V2_1,
+                    false,
+                    false,
+                    true,
+                    false,
+                )?;
                 self.global_env = env;
                 log::info!(
                     "self.global_env.get_module_count() = {:?}",
@@ -131,7 +153,6 @@ impl Project {
             &mut targets_paths,
             &mut dependents_paths,
         )?;
-        // new_project.get_global_env_by_move_package_v1(report_err, &working_dir);
         new_project.get_global_env_by_move_package_v2(&working_dir)?;
         log::info!(
             "new_project.global_env.get_module_count() = {:?}",

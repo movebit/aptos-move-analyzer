@@ -110,7 +110,7 @@ mod tests {
                     },
                     "uri": ("file://".to_string() + path_concat(
                         home::home_dir().unwrap().as_path(),
-                        PathBuf::from(".move/https___github_com_aptos-labs_aptos-core_git_83641d3f083762f31700060e5e95fbb1cbc28bf0/aptos-move/framework/aptos-stdlib/sources/simple_map.move")
+                        PathBuf::from(".move/https___github_com_aptos-labs_aptos-core_git_eb0144a39ada521d8dee01c9dbd601853d383fb3/aptos-move/framework/aptos-stdlib/sources/simple_map.move")
                             .as_path()).to_str().unwrap()
                     ).replace('\\', "/")
                 }

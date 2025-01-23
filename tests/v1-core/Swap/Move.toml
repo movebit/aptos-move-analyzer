@@ -3,7 +3,7 @@ name = "AnimeSwapV1"
 version = "1.0.1"
 
 [dependencies]
-AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "83641d3f083762f31700060e5e95fbb1cbc28bf0" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "eb0144a39ada521d8dee01c9dbd601853d383fb3" }
 LPCoin = { local= "../LPCoin" }
 LPResourceAccount = { local= "../LPResourceAccount" }
 U256 = { local= "../u256" }
