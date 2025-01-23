@@ -701,32 +701,13 @@ impl Handler {
         }
     }
 
-    fn process_struct(&mut self, env: &GlobalEnv) {
+    fn process_struct(&mut self, env: &GlobalEnv) -> Option<()> {
         log::info!(">> process_struct for goto definition");
-        let mut found_target_struct = false;
-        let mut target_struct_id = StructId::new(env.symbol_pool().make("name"));
-        let target_module = env.get_module(self.target_module_id);
-        for struct_env in target_module.get_structs() {
-            let struct_loc = struct_env.get_loc();
-            let (_, struct_start_pos) = env.get_file_and_location(&struct_loc).unwrap();
-            let (_, struct_end_pos) = env
-                .get_file_and_location(&move_model::model::Loc::new(
-                    struct_loc.file_id(),
-                    codespan::Span::new(struct_loc.span().end(), struct_loc.span().end()),
-                ))
-                .unwrap();
-            if struct_start_pos.line.0 < self.line && self.line < struct_end_pos.line.0 {
-                target_struct_id = struct_env.get_id();
-                found_target_struct = true;
-                break;
-            }
-        }
-        if !found_target_struct {
-            return;
-        }
 
         let target_module = env.get_module(self.target_module_id);
-        let target_struct = target_module.get_struct(target_struct_id);
+        let target_struct = target_module
+            .get_structs()
+            .find(|s| s.get_loc().contains(env, (self.line, self.col)))?;
         let target_struct_loc = target_struct.get_loc();
         self.get_mouse_loc(env, &target_struct_loc);
 
@@ -735,7 +716,7 @@ impl Handler {
             && codespan::ByteOffset(offset_epos as i64)
                 == target_struct_loc.span().end() - target_struct_loc.span().start()
         {
-            return;
+            return None;
         }
         let capture_field_start = target_struct_loc.span().start();
         let atomic_field_loc = move_model::model::Loc::new(
@@ -785,6 +766,7 @@ impl Handler {
             }
         }
         log::info!("<< process_struct for goto definition");
+        Some(())
     }
 
     fn process_spec_struct(&mut self, env: &GlobalEnv) {
