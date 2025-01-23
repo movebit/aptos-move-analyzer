@@ -318,9 +318,7 @@ impl Handler {
             Address::Numerical(addr) => addr.to_owned(),
             Address::Symbolic(sym) => {
                 let Some(addr) = env.resolve_address_alias(*sym) else {
-                    log::error!(
-                            "could not convert addrname to addrnum, please check you use decl"
-                        );
+                    log::error!("could not convert addrname to addrnum, please check you use decl");
                     return None;
                 };
                 addr
@@ -402,43 +400,34 @@ impl Handler {
         Some(())
     }
 
-    fn process_func(&mut self, env: &GlobalEnv) {
+    fn process_func(&mut self, env: &GlobalEnv) -> Option<()> {
         log::info!("process_func for goto defnition");
-        let mut found_target_fun = false;
-        let mut target_fun_id = FunId::new(env.symbol_pool().make("name"));
 
         let target_module = env.get_module(self.target_module_id);
-        for fun in target_module.get_functions() {
+        let target_fun = target_module.get_functions().find(|fun| {
             let this_fun_loc = fun.get_loc();
-            let (_, func_start_pos) = env.get_file_and_location(&this_fun_loc).unwrap();
-            let (_, func_end_pos) = env
-                .get_file_and_location(&move_model::model::Loc::new(
+            let func_start_pos = env.get_location(&this_fun_loc).unwrap();
+            let func_end_pos = env
+                .get_location(&move_model::model::Loc::new(
                     this_fun_loc.file_id(),
                     codespan::Span::new(this_fun_loc.span().end(), this_fun_loc.span().end()),
                 ))
                 .unwrap();
-
-            if func_start_pos.line.0 <= self.line && self.line < func_end_pos.line.0 {
+            let found = func_start_pos.line.0 <= self.line && self.line < func_end_pos.line.0;
+            if found {
                 log::info!(
                     "get target function {}: func_start_pos = {:?}, func_end_pos = {:?}",
                     fun.get_name_string(),
                     func_start_pos,
                     func_end_pos
                 );
-                target_fun_id = fun.get_id();
-                found_target_fun = true;
-                break;
             }
-        }
+            found
+        })?;
 
-        if !found_target_fun {
-            return;
-        }
-
-        let target_module = env.get_module(self.target_module_id);
-        let target_fun = target_module.get_function(target_fun_id);
         let target_fun_loc: move_model::model::Loc = target_fun.get_loc();
         self.target_function_id = Some(target_fun.get_id());
+
         self.get_mouse_loc(env, &target_fun_loc);
         self.process_parameter(env, &target_fun);
         self.process_return_type_and_specifiers(env, &target_fun);
@@ -447,6 +436,7 @@ impl Handler {
             self.process_expr(env, exp);
         };
         self.target_function_id = None;
+        Some(())
     }
 
     fn process_parameter(&mut self, env: &GlobalEnv, target_fun: &FunctionEnv) {
