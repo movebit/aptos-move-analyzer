@@ -33,14 +33,7 @@ pub struct FunID {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct SourceDefs {
-    // pub(crate) sources: HashMap<PathBuf, Vec<move_compiler::parser::ast::Definition>>,
-    // pub(crate) tests: HashMap<PathBuf, Vec<move_compiler::parser::ast::Definition>>,
-    // pub(crate) scripts: HashMap<PathBuf, Vec<move_compiler::parser::ast::Definition>>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct DummyHandler;
+pub struct SourceDefs {}
 
 // pub func
 pub(crate) fn file_modify_time(x: &Path) -> Option<SystemTime> {
@@ -87,22 +80,6 @@ pub trait ItemOrAccessHandler: std::fmt::Display {
         _: &Path,
         _: String,
     ) {
-    }
-}
-
-impl ItemOrAccessHandler for DummyHandler {
-    fn finished(&self) -> bool {
-        false
-    }
-
-    fn visit_fun_or_spec_body(&self) -> bool {
-        false
-    }
-}
-
-impl std::fmt::Display for DummyHandler {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
     }
 }
 
