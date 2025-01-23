@@ -1,7 +1,7 @@
 // Copyright (c) The BitsLab.Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ext::{GlobalEnvExt, SymbolExt};
+use crate::ext::{GlobalEnvExt, LocExt, SymbolExt};
 use crate::project::Project;
 use crate::{
     analyzer_handler::*,
@@ -397,26 +397,9 @@ impl Handler {
         log::info!("process_func for goto defnition");
 
         let target_module = env.get_module(self.target_module_id);
-        let target_fun = target_module.get_functions().find(|fun| {
-            let this_fun_loc = fun.get_loc();
-            let func_start_pos = env.get_location(&this_fun_loc).unwrap();
-            let func_end_pos = env
-                .get_location(&move_model::model::Loc::new(
-                    this_fun_loc.file_id(),
-                    codespan::Span::new(this_fun_loc.span().end(), this_fun_loc.span().end()),
-                ))
-                .unwrap();
-            let found = func_start_pos.line.0 <= self.line && self.line < func_end_pos.line.0;
-            if found {
-                log::info!(
-                    "get target function {}: func_start_pos = {:?}, func_end_pos = {:?}",
-                    fun.get_name_string(),
-                    func_start_pos,
-                    func_end_pos
-                );
-            }
-            found
-        })?;
+        let target_fun = target_module
+            .get_functions()
+            .find(|fun| fun.get_loc().contains(env, (self.line, self.col)))?;
 
         let target_fun_loc: move_model::model::Loc = target_fun.get_loc();
         self.target_function_id = Some(target_fun.get_id());

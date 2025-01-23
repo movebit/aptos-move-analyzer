@@ -126,7 +126,6 @@ mod tests {
         "#);
     }
 
-    #[ignore = "not implemented yet"]
     #[test]
     fn test_resolve_function_in_use_stmt_with_numeric_address() {
         // language=Move
@@ -271,7 +270,6 @@ mod tests {
         "#);
     }
 
-    #[ignore = "not implemented yet"]
     #[test]
     fn test_resolve_struct_from_type_single_line_function() {
         // language=Move
@@ -300,7 +298,6 @@ mod tests {
         "#);
     }
 
-    #[ignore = "not implemented yet"]
     #[test]
     fn test_resolve_struct_from_struct_literal_single_line() {
         // language=Move
