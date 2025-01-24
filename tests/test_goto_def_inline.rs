@@ -625,6 +625,25 @@ mod tests {
         "#)
     }
 
+    #[ignore = "not implemented?"]
+    #[test]
+    fn test_resolve_function_call_from_inside_struct_spec() {
+        // language=Move
+        test_resolve_reference(r#"
+    module 0x1::m {
+        struct S { val: u8 }
+        spec fun call(): bool { true }
+                  //X
+    }
+    spec 0x1::m {
+        spec S {
+            assert call();
+                  //^
+        }
+    }
+        "#)
+    }
+
     #[ignore = "not implemented"]
     #[test]
     fn test_resolve_function_call_inside_spec() {
