@@ -1,37 +1,36 @@
-#[cfg(test)]
-mod tests {
-    use aptos_move_analyzer::goto_definition::on_goto_definition;
-    use aptos_move_analyzer::project::Project;
-    use std::fs;
-    use std::path::PathBuf;
-    use tempfile::TempDir;
+use aptos_move_analyzer::goto_definition::on_goto_definition;
+use aptos_move_analyzer::project::Project;
+use std::fs;
+use std::path::PathBuf;
+use line_index::TextSize;
+use tempfile::TempDir;
 
-    fn test_aptos_project(package_root: PathBuf) -> Project {
-        let project = Project::new(package_root, |_| {}).unwrap();
-        assert!(project.load_ok(), "Cannot load");
-        project
-    }
+fn test_aptos_project(package_root: PathBuf) -> Project {
+    let project = Project::new(package_root, |_| {}).unwrap();
+    assert!(project.load_ok(), "Cannot load");
+    project
+}
 
-    fn get_marked_position(source: &str, mark: &str) -> (u32, u32) {
-        let offset = source.find(mark).unwrap();
-        let (line, col) = line_col::LineColLookup::new(&source).get(offset);
-        let ref_line = line - 1; // it's a //^ comment underneath the element
-        let ref_col = col + 2; // we need a position of ^
-                            // it's zero based
-        ((ref_line - 1) as u32, (ref_col - 1) as u32)
-    }
+fn get_marked_position(source: &str, mark: &str) -> (u32, u32) {
+    let offset = source.find(mark).unwrap() as u32;
+    let file_index = line_index::LineIndex::new(source);
+    let line_index::LineCol { line, col } = file_index.line_col(TextSize::new(offset));
+    let ref_line = line - 1; // it's a //^ comment underneath the element
+    let ref_col = col + 2; // we need a position of ^
+    (ref_line, ref_col)
+}
 
-    fn is_inside_range(pos: lsp_types::Position, range: lsp_types::Range) -> bool {
-        range.start <= pos && pos <= range.end
-    }
+fn is_inside_range(pos: lsp_types::Position, range: lsp_types::Range) -> bool {
+    range.start <= pos && pos <= range.end
+}
 
-    fn move_test_package(temp_dir: &TempDir, main_source: &str) -> PathBuf {
-        let package_root = temp_dir.path().to_path_buf();
-        fs::create_dir(package_root.join("sources")).unwrap();
-        fs::write(
-            package_root.join("Move.toml"),
-            // language=Toml
-            r#"
+fn move_test_package(temp_dir: &TempDir, main_source: &str) -> PathBuf {
+    let package_root = temp_dir.path().to_path_buf();
+    fs::create_dir(package_root.join("sources")).unwrap();
+    fs::write(
+        package_root.join("Move.toml"),
+        // language=Toml
+        r#"
     [package]
     name = "MyTestPackage"
     version = "1.0.0"
@@ -40,35 +39,44 @@ mod tests {
     [addresses]
     std = "0x1"
             "#,
-        )
-        .unwrap();
-        fs::write(
-            package_root.join("sources").join("main.move"),
-            main_source.trim_start(),
-        )
-        .unwrap();
-        package_root
-    }
+    )
+    .unwrap();
+    fs::write(
+        package_root.join("sources").join("main.move"),
+        main_source.trim_start(),
+    )
+    .unwrap();
+    package_root
+}
 
-    fn test_resolve_reference(main_source: &str) {
-        let temp = tempfile::tempdir().unwrap();
-        let package_root = move_test_package(&temp, main_source);
-        let aptos_project = test_aptos_project(package_root.clone());
+fn test_resolve_reference(main_source: &str) {
+    let temp = tempfile::tempdir().unwrap();
+    let package_root = move_test_package(&temp, main_source);
+    let aptos_project = test_aptos_project(package_root.clone());
 
-        let source_fpath = package_root.join("sources").join("main.move");
-        let source = fs::read_to_string(source_fpath.clone()).unwrap();
+    let source_fpath = package_root.join("sources").join("main.move");
+    let source = fs::read_to_string(source_fpath.clone()).unwrap();
 
-        let (ref_line, ref_col) = get_marked_position(&source, "//^");
-        let (target_line, target_col) = get_marked_position(&source, "//X");
+    let (ref_line, ref_col) = get_marked_position(&source, "//^");
+    let (target_line, target_col) = get_marked_position(&source, "//X");
 
-        let locations = on_goto_definition(&aptos_project, source_fpath, ref_line, ref_col);
-        assert!(!locations.is_empty(), "unresolved, locations = {:?}", locations);
+    let locations = on_goto_definition(&aptos_project, source_fpath, ref_line, ref_col);
+    assert!(
+        !locations.is_empty(),
+        "unresolved, locations = {:?}",
+        locations
+    );
 
-        let actual_location = locations.first().unwrap().to_owned();
-        let target_pos = lsp_types::Position::new(target_line, target_col);
-        // todo: check for file
-        assert!(is_inside_range(target_pos, actual_location.range));
-    }
+    let actual_location = locations.first().unwrap().to_owned();
+    let target_pos = lsp_types::Position::new(target_line, target_col);
+    // todo: check for file
+    assert!(is_inside_range(target_pos, actual_location.range));
+}
+
+#[rustfmt::skip]
+#[cfg(test)]
+mod tests {
+    use super::*;
 
     #[test]
     fn test_resolve_function_call() {
@@ -76,7 +84,7 @@ mod tests {
         test_resolve_reference(r#"
     module std::main {
         fun call() {}
-        //X
+            //X
         fun main() {
             call();
             //^

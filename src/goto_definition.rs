@@ -1,6 +1,8 @@
 // Copyright (c) The BitsLab.Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::ext::{GlobalEnvExt, SymbolExt};
+use crate::project::Project;
 use crate::{
     analyzer_handler::*,
     context::*,
@@ -12,6 +14,7 @@ use lsp_server::*;
 use lsp_types::*;
 use move_command_line_common::files::FileHash;
 use move_compiler::parser::lexer::{Lexer, Tok};
+use move_model::ast::Address;
 use move_model::{
     ast::{ExpData::*, Operation::*, Pattern as MoveModelPattern, Spec, SpecBlockTarget},
     model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, ModuleId, NodeId, StructId},
@@ -21,7 +24,6 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use crate::project::Project;
 
 /// Handles go-to-def request of the language server.
 pub fn on_go_to_def_request(context: &Context, request: &Request) -> lsp_server::Response {
@@ -74,7 +76,6 @@ pub fn on_goto_definition(
     ref_col: u32,
 ) -> Vec<lsp_types::Location> {
     let mut handler = Handler::new(ref_fpath.clone(), ref_line, ref_col);
-    handler.addrname_2_addrnum = project.addrname_2_addrnum.clone();
     project.run_visitor_for_file(&mut handler, &ref_fpath, String::default());
 
     handler.remove_not_in_loc(&project.global_env);
@@ -94,7 +95,6 @@ pub(crate) struct Handler {
     pub(crate) target_module_id: ModuleId,
     pub(crate) target_function_id: Option<FunId>,
     pub(crate) symbol_2_pattern_id: HashMap<Symbol, NodeId>, // LocalVar => Block::Pattern, only remeber the last pattern
-    pub(crate) addrname_2_addrnum: HashMap<String, String>,
 }
 
 impl Handler {
@@ -110,7 +110,6 @@ impl Handler {
             target_module_id: ModuleId::new(0),
             target_function_id: None,
             symbol_2_pattern_id: HashMap::new(),
-            addrname_2_addrnum: HashMap::new(),
         }
     }
 
@@ -119,17 +118,9 @@ impl Handler {
         env: &GlobalEnv,
         loc: &move_model::model::Loc,
     ) -> bool {
-        if let Some(obj_first_col) = env.get_location(&move_model::model::Loc::new(
-            loc.file_id(),
-            codespan::Span::new(
-                loc.span().start(),
-                loc.span().start() + codespan::ByteOffset(1),
-            ),
-        )) {
-            if let Some(obj_last_col) = env.get_location(&move_model::model::Loc::new(
-                loc.file_id(),
-                codespan::Span::new(loc.span().end(), loc.span().end() + codespan::ByteOffset(1)),
-            )) {
+        if let Some(obj_first_col) = env.get_location_at_offset(loc.file_id(), loc.span().start()) {
+            if let Some(obj_last_col) = env.get_location_at_offset(loc.file_id(), loc.span().end())
+            {
                 if u32::from(obj_first_col.line) == self.line
                     && u32::from(obj_first_col.column) <= self.col
                     && self.col <= u32::from(obj_last_col.column)
@@ -298,7 +289,7 @@ impl Handler {
         self.result_candidates = res_result_candidates;
     }
 
-    fn process_use_decl(&mut self, env: &GlobalEnv) {
+    fn process_use_decl(&mut self, env: &GlobalEnv) -> Option<()> {
         log::info!("process_use_decl for goto definition");
         let target_module = env.get_module(self.target_module_id);
         let spool = env.symbol_pool();
@@ -308,78 +299,54 @@ impl Handler {
         let mut capture_items_loc = move_model::model::Loc::default();
         let mut addrnum_with_module_name = Default::default();
 
-        for use_decl in target_module.get_use_decls() {
-            if !self.check_move_model_loc_contains_mouse_pos(env, &use_decl.loc) {
-                continue;
-            }
-            let (_, use_pos) = env.get_file_and_location(&use_decl.loc).unwrap();
-            log::info!("find use decl module, line: {}", use_pos.line);
+        let use_decl = target_module
+            .get_use_decls()
+            .iter()
+            .find(|us| self.check_move_model_loc_contains_mouse_pos(env, &us.loc))?;
 
-            let used_module_name = use_decl.module_name.display_full(env).to_string();
-            let before_after = used_module_name.split("::").collect::<Vec<_>>();
-            if before_after.len() < 2 {
-                log::error!("use decl module name len should >= 2");
-                continue;
-            }
+        let use_pos = env.get_location(&use_decl.loc).unwrap();
+        log::info!("find use decl module, line: {}", use_pos.line);
 
-            let addrnum = match self.addrname_2_addrnum.get(&before_after[0].to_string()) {
-                Some(x) => x,
-                None => {
+        let numeric_module_addr = match use_decl.module_name.addr() {
+            Address::Numerical(addr) => addr.to_owned(),
+            Address::Symbolic(sym) => {
+                let Some(addr) = env.resolve_address_alias(*sym) else {
                     log::error!("could not convert addrname to addrnum, please check you use decl");
-                    continue;
-                }
-            };
-
-            addrnum_with_module_name = addrnum.clone() + "::" + before_after[1];
-            found_usedecl_same_line = true;
-            capture_items_loc = use_decl.loc.clone();
-
-            if !use_decl.members.is_empty() {
-                for (member_loc, name, _alias_name) in use_decl.members.clone().into_iter() {
-                    log::info!("member_loc = {:?} ---", env.get_location(&member_loc));
-                    if self.check_move_model_loc_contains_mouse_pos(env, &member_loc) {
-                        target_stct_or_fn = name.display(spool).to_string();
-                        found_target_stct_or_fn = true;
-                        capture_items_loc = member_loc;
-                        log::info!("find use decl member {}", target_stct_or_fn);
-                        break;
-                    }
-                }
-            } else {
-                target_stct_or_fn = before_after[1].to_string();
-                found_target_stct_or_fn = true;
+                    return None;
+                };
+                addr
             }
-            if found_target_stct_or_fn {
-                break;
-            }
-        }
-
-        if !found_target_stct_or_fn && !found_usedecl_same_line {
-            return;
-        }
-
-        let mut option_use_module: Option<ModuleEnv<'_>> = None;
-        for mo_env in env.get_modules() {
-            let mo_name_str = mo_env.get_name().display_full(env).to_string();
-            log::info!(
-                "addrnum_with_module_name = {:?}, mo_name_str = {:?}",
-                addrnum_with_module_name,
-                mo_name_str
-            );
-            if addrnum_with_module_name.len() != mo_name_str.len() {
-                continue;
-            }
-
-            if mo_name_str.to_lowercase() == addrnum_with_module_name.to_lowercase() {
-                option_use_module = Some(mo_env);
-                break;
-            }
-        }
-
-        let use_decl_module = match option_use_module {
-            Some(x) => x,
-            None => return,
         };
+        let module_name = use_decl.module_name.name().to_string(env);
+
+        addrnum_with_module_name = format!(
+            "{}::{}",
+            numeric_module_addr.to_standard_string(),
+            module_name.clone()
+        );
+        found_usedecl_same_line = true;
+        capture_items_loc = use_decl.loc.clone();
+
+        if !use_decl.members.is_empty() {
+            let maybe_member = use_decl
+                .members
+                .iter()
+                .find(|(m_loc, _, _)| self.check_move_model_loc_contains_mouse_pos(env, m_loc));
+            if let Some((m_loc, m_name, _)) = maybe_member.cloned() {
+                target_stct_or_fn = m_name.to_string(env);
+                found_target_stct_or_fn = true;
+                capture_items_loc = m_loc;
+                log::info!("find use decl member {}", target_stct_or_fn);
+            }
+        } else {
+            target_stct_or_fn = module_name.to_string();
+            found_target_stct_or_fn = true;
+        }
+
+        let use_decl_module = env.get_modules().find(|m| {
+            m.get_full_name_str()
+                .eq_ignore_ascii_case(&addrnum_with_module_name)
+        })?;
 
         self.get_mouse_loc(env, &capture_items_loc);
         if found_target_stct_or_fn {
@@ -397,7 +364,7 @@ impl Handler {
                         env.get_source(&capture_items_loc)
                     );
                     self.insert_result(env, &stct.get_loc(), &capture_items_loc);
-                    return;
+                    return Some(());
                 }
             }
             for func in use_decl_module.get_functions() {
@@ -413,54 +380,47 @@ impl Handler {
                         env.get_source(&capture_items_loc)
                     );
                     self.insert_result(env, &func.get_loc(), &capture_items_loc);
-                    return;
+                    return Some(());
                 }
             }
         }
 
         if found_usedecl_same_line {
             log::info!("find use decl module...");
-            self.insert_result(env, &use_decl_module.get_loc(), &capture_items_loc)
+            self.insert_result(env, &use_decl_module.get_loc(), &capture_items_loc);
         }
+
+        Some(())
     }
 
-    fn process_func(&mut self, env: &GlobalEnv) {
+    fn process_func(&mut self, env: &GlobalEnv) -> Option<()> {
         log::info!("process_func for goto defnition");
-        let mut found_target_fun = false;
-        let mut target_fun_id = FunId::new(env.symbol_pool().make("name"));
 
         let target_module = env.get_module(self.target_module_id);
-        for fun in target_module.get_functions() {
+        let target_fun = target_module.get_functions().find(|fun| {
             let this_fun_loc = fun.get_loc();
-            let (_, func_start_pos) = env.get_file_and_location(&this_fun_loc).unwrap();
-            let (_, func_end_pos) = env
-                .get_file_and_location(&move_model::model::Loc::new(
+            let func_start_pos = env.get_location(&this_fun_loc).unwrap();
+            let func_end_pos = env
+                .get_location(&move_model::model::Loc::new(
                     this_fun_loc.file_id(),
                     codespan::Span::new(this_fun_loc.span().end(), this_fun_loc.span().end()),
                 ))
                 .unwrap();
-
-            if func_start_pos.line.0 <= self.line && self.line < func_end_pos.line.0 {
+            let found = func_start_pos.line.0 <= self.line && self.line < func_end_pos.line.0;
+            if found {
                 log::info!(
                     "get target function {}: func_start_pos = {:?}, func_end_pos = {:?}",
                     fun.get_name_string(),
                     func_start_pos,
                     func_end_pos
                 );
-                target_fun_id = fun.get_id();
-                found_target_fun = true;
-                break;
             }
-        }
+            found
+        })?;
 
-        if !found_target_fun {
-            return;
-        }
-
-        let target_module = env.get_module(self.target_module_id);
-        let target_fun = target_module.get_function(target_fun_id);
         let target_fun_loc: move_model::model::Loc = target_fun.get_loc();
         self.target_function_id = Some(target_fun.get_id());
+
         self.get_mouse_loc(env, &target_fun_loc);
         self.process_parameter(env, &target_fun);
         self.process_return_type_and_specifiers(env, &target_fun);
@@ -469,6 +429,7 @@ impl Handler {
             self.process_expr(env, exp);
         };
         self.target_function_id = None;
+        Some(())
     }
 
     fn process_parameter(&mut self, env: &GlobalEnv, target_fun: &FunctionEnv) {
