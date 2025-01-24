@@ -292,7 +292,6 @@ impl Handler {
     fn process_use_decl(&mut self, env: &GlobalEnv) -> Option<()> {
         log::info!("process_use_decl for goto definition");
         let target_module = env.get_module(self.target_module_id);
-        let spool = env.symbol_pool();
         let mut target_stct_or_fn = String::default();
         let mut found_target_stct_or_fn = false;
         let mut found_usedecl_same_line = false;
@@ -320,8 +319,8 @@ impl Handler {
         let module_name = use_decl.module_name.name().to_string(env);
 
         addrnum_with_module_name = format!(
-            "{}::{}",
-            numeric_module_addr.to_standard_string(),
+            "0x{}::{}",
+            numeric_module_addr.short_str_lossless(),
             module_name.clone()
         );
         found_usedecl_same_line = true;
