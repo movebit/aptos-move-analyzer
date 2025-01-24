@@ -73,21 +73,21 @@ impl Project {
                 let no_tests_source_deps = compile_option
                     .sources_deps
                     .iter()
-                    .filter(|dep| 
-                        (path_utils::has_path_component_with_name(&dep.into(), "aptos-move") &&
-                        !path_utils::has_path_component_with_name(&dep.into(), "tests")) ||
-                        !path_utils::has_path_component_with_name(&dep.into(), "aptos-move")
-                    )
+                    .filter(|dep| {
+                        (path_utils::has_path_component_with_name(&dep.into(), "aptos-move")
+                            && !path_utils::has_path_component_with_name(&dep.into(), "tests"))
+                            || !path_utils::has_path_component_with_name(&dep.into(), "aptos-move")
+                    })
                     .map(|dep| dep.to_owned())
                     .collect::<Vec<_>>();
                 let no_tests_dependencies = compile_option
                     .dependencies
                     .iter()
-                    .filter(|dep| 
-                        (path_utils::has_path_component_with_name(&dep.into(), "aptos-move") &&
-                        !path_utils::has_path_component_with_name(&dep.into(), "tests")) ||
-                        !path_utils::has_path_component_with_name(&dep.into(), "aptos-move")
-                    )
+                    .filter(|dep| {
+                        (path_utils::has_path_component_with_name(&dep.into(), "aptos-move")
+                            && !path_utils::has_path_component_with_name(&dep.into(), "tests"))
+                            || !path_utils::has_path_component_with_name(&dep.into(), "aptos-move")
+                    })
                     .map(|dep| dep.to_owned())
                     .collect::<Vec<_>>();
                 let mut env = move_model::run_model_builder_in_compiler_mode(

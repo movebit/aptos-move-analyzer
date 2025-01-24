@@ -24,10 +24,7 @@ use lsp_types::{
     TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use move_command_line_common::files::FileHash;
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-};
+use std::{collections::HashMap, path::PathBuf};
 use url::Url;
 
 struct AnalyzerConfig {

@@ -902,7 +902,10 @@ impl Handler {
             }
 
             if let Ok(pack_struct_str) = env.get_source(&this_call_loc) {
-                log::info!("<refrences><process_call> pack_struct_str = {:?}", pack_struct_str);
+                log::info!(
+                    "<refrences><process_call> pack_struct_str = {:?}",
+                    pack_struct_str
+                );
                 for arg in args {
                     for node_id in arg.node_ids() {
                         log::info!("arg = {:?}", env.get_source(&env.get_node_loc(node_id)));
@@ -1299,7 +1302,10 @@ impl Handler {
                                 for enum_field in called_struct.get_variants() {
                                     if field_name == enum_field {
                                         result_candidates.push(
-                                            self.convert_loc_to_file_range(mod_env.env, &result_loc),
+                                            self.convert_loc_to_file_range(
+                                                mod_env.env,
+                                                &result_loc,
+                                            ),
                                         );
                                         break;
                                     }
@@ -1385,9 +1391,10 @@ impl Handler {
                                     // let color = Color::Blue;  // this is pack operation
                                     for enum_field in pattern_struct.get_variants() {
                                         if field_name == enum_field {
-                                            result_candidates.push(
-                                                self.convert_loc_to_file_range(mod_env.env, &result_loc),
-                                            );
+                                            result_candidates.push(self.convert_loc_to_file_range(
+                                                mod_env.env,
+                                                &result_loc,
+                                            ));
                                             break;
                                         }
                                     }

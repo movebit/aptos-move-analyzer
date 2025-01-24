@@ -160,7 +160,8 @@ impl FileRange {
                 character: self.col_end,
             },
         };
-        let uri = url::Url::from_file_path(self.path.as_path().canonicalize().unwrap_or_default()).unwrap();
+        let uri = url::Url::from_file_path(self.path.as_path().canonicalize().unwrap_or_default())
+            .unwrap();
         lsp_types::Location::new(uri, range)
     }
 }

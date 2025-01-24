@@ -1,8 +1,8 @@
 use aptos_move_analyzer::goto_definition::on_goto_definition;
 use aptos_move_analyzer::project::Project;
+use line_index::TextSize;
 use std::fs;
 use std::path::PathBuf;
-use line_index::TextSize;
 use tempfile::TempDir;
 
 fn test_aptos_project(package_root: PathBuf) -> Project {
