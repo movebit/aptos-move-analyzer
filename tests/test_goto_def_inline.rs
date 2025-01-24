@@ -1,5 +1,7 @@
 use aptos_move_analyzer::goto_definition::on_goto_definition;
 use aptos_move_analyzer::project::Project;
+use im::{hashmap, HashMap};
+use itertools::Itertools;
 use line_index::TextSize;
 use std::fs;
 use std::path::PathBuf;
@@ -24,12 +26,20 @@ fn is_inside_range(pos: lsp_types::Position, range: lsp_types::Range) -> bool {
     range.start <= pos && pos <= range.end
 }
 
-fn move_test_package(temp_dir: &TempDir, main_source: &str) -> PathBuf {
+fn move_test_package(
+    temp_dir: &TempDir,
+    main_source: &str,
+    addresses: HashMap<&str, &str>,
+) -> PathBuf {
     let package_root = temp_dir.path().to_path_buf();
     fs::create_dir(package_root.join("sources")).unwrap();
-    fs::write(
-        package_root.join("Move.toml"),
-        // language=Toml
+
+    let addresses_text = addresses
+        .iter()
+        .map(|(name, value)| format!("{} = \"{}\"", name, value))
+        .join("\n    ");
+    // language=Toml
+    let move_toml_text = format!(
         r#"
     [package]
     name = "MyTestPackage"
@@ -37,10 +47,11 @@ fn move_test_package(temp_dir: &TempDir, main_source: &str) -> PathBuf {
     authors = []
 
     [addresses]
-    std = "0x1"
-            "#,
-    )
-    .unwrap();
+    {addresses_text}
+    "#
+    );
+
+    fs::write(package_root.join("Move.toml"), move_toml_text.trim_start()).unwrap();
     fs::write(
         package_root.join("sources").join("main.move"),
         main_source.trim_start(),
@@ -50,8 +61,12 @@ fn move_test_package(temp_dir: &TempDir, main_source: &str) -> PathBuf {
 }
 
 fn test_resolve_reference(main_source: &str) {
+    test_resolve_reference_with_addresses(main_source, hashmap! {"std" => "0x1"});
+}
+
+fn test_resolve_reference_with_addresses(main_source: &str, addrs: HashMap<&str, &str>) {
     let temp = tempfile::tempdir().unwrap();
-    let package_root = move_test_package(&temp, main_source);
+    let package_root = move_test_package(&temp, main_source, addrs);
     let aptos_project = test_aptos_project(package_root.clone());
 
     let source_fpath = package_root.join("sources").join("main.move");
@@ -658,5 +673,38 @@ mod tests {
                       //^
     }
         "#)
+    }
+
+    #[test]
+    fn test_resolve_module_with_non_standard_address_with_leading_zeroes_numeric() {
+        // language=Move
+        test_resolve_reference(r#"
+    module 0x002098630cfad4734812fa37dc18d9b8d59242feabe49259e26318d468a99584::m {
+        public fun call() {}
+                  //X
+    }
+    module 0x002098630cfad4734812fa37dc18d9b8d59242feabe49259e26318d468a99584::main {
+        use 0x002098630cfad4734812fa37dc18d9b8d59242feabe49259e26318d468a99584::m::call;
+                                                                                  //^
+    }
+        "#)
+    }
+
+    #[test]
+    fn test_resolve_module_with_non_standard_address_with_leading_zeroes_named() {
+        let addrs = hashmap! {
+            "no_std" => "0x002098630cfad4734812fa37dc18d9b8d59242feabe49259e26318d468a99584"
+        };
+        // language=Move
+        test_resolve_reference_with_addresses(r#"
+    module no_std::m {
+        public fun call() {}
+                  //X
+    }
+    module no_std::main {
+        use no_std::m::call;
+                      //^
+    }
+        "#, addrs)
     }
 }
