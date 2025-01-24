@@ -29,3 +29,11 @@
 - fix issue#12: odd behaviors with diag report
 - add clear_ui_diag()
 - optimize code
+
+## 2025/1/24 v1.0.5
+- fix bug on get_global_env_by_move_package_v2() which cause some error "unbound module ..."
+- fix bug on process_use_decl() about addr_name's format
+- update the move-model dependency of aptos-core
+- update formatting code feature
+- optimize code
+- add test cases and improve UT

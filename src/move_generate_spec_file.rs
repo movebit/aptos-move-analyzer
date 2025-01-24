@@ -78,7 +78,7 @@ where
 
         log::info!("generate spec module: {}", module_env.get_full_name_str());
         // find module_env's namespace
-        let mut k = ("".to_string(), "".to_string());
+        let k: (String, String);
         if let move_model::ast::Address::Numerical(addr) = module_env.self_address() {
             let module_name = module_env.get_name().display(&env).to_string();
             k = (addr.to_standard_string(), module_name.clone());

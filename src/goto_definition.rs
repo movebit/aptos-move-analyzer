@@ -17,7 +17,7 @@ use move_compiler::parser::lexer::{Lexer, Tok};
 use move_model::ast::Address;
 use move_model::{
     ast::{ExpData::*, Operation::*, Pattern as MoveModelPattern, Spec, SpecBlockTarget},
-    model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, ModuleId, NodeId, StructId},
+    model::{FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, StructId},
     symbol::Symbol,
 };
 use std::{
@@ -294,9 +294,6 @@ impl Handler {
         let target_module = env.get_module(self.target_module_id);
         let mut target_stct_or_fn = String::default();
         let mut found_target_stct_or_fn = false;
-        let mut found_usedecl_same_line = false;
-        let mut capture_items_loc = move_model::model::Loc::default();
-        let mut addrnum_with_module_name = Default::default();
 
         let use_decl = target_module
             .get_use_decls()
@@ -318,13 +315,12 @@ impl Handler {
         };
         let module_name = use_decl.module_name.name().to_string(env);
 
-        addrnum_with_module_name = format!(
+        let addrnum_with_module_name = format!(
             "0x{}::{}",
             numeric_module_addr.short_str_lossless(),
             module_name.clone()
         );
-        found_usedecl_same_line = true;
-        capture_items_loc = use_decl.loc.clone();
+        let mut capture_items_loc = use_decl.loc.clone();
 
         if !use_decl.members.is_empty() {
             let maybe_member = use_decl
@@ -384,11 +380,8 @@ impl Handler {
             }
         }
 
-        if found_usedecl_same_line {
-            log::info!("find use decl module...");
-            self.insert_result(env, &use_decl_module.get_loc(), &capture_items_loc);
-        }
-
+        log::info!("find use decl module...");
+        self.insert_result(env, &use_decl_module.get_loc(), &capture_items_loc);
         Some(())
     }
 
