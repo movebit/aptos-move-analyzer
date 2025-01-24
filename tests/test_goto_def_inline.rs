@@ -126,7 +126,6 @@ mod tests {
         "#);
     }
 
-    #[ignore = "not implemented yet"]
     #[test]
     fn test_resolve_function_in_use_stmt_with_numeric_address() {
         // language=Move
@@ -190,7 +189,6 @@ mod tests {
         "#);
     }
 
-    #[ignore = "not implemented yet"]
     #[test]
     fn test_resolve_module_self_in_use_group_multiline() {
         // language=Move
@@ -207,7 +205,6 @@ mod tests {
         "#);
     }
 
-    #[ignore = "not implemented yet"]
     #[test]
     fn test_resolve_function_in_use_group_on_separate_line() {
         // language=Move
@@ -271,7 +268,6 @@ mod tests {
         "#);
     }
 
-    #[ignore = "not implemented yet"]
     #[test]
     fn test_resolve_struct_from_type_single_line_function() {
         // language=Move
@@ -300,7 +296,6 @@ mod tests {
         "#);
     }
 
-    #[ignore = "not implemented yet"]
     #[test]
     fn test_resolve_struct_from_struct_literal_single_line() {
         // language=Move
@@ -635,6 +630,33 @@ mod tests {
         "#)
     }
 
+    #[test]
+    fn test_resolve_type_for_struct_field() {
+        // language=Move
+        test_resolve_reference(r#"
+    module 0x1::m {
+        struct S {
+             //X
+            val: u8
+        }
+        struct R {
+            val: S
+               //^
+        }
+    }
+        "#)
+    }
 
-
+    #[test]
+    fn test_resolve_type_for_struct_field_single_line() {
+        // language=Move
+        test_resolve_reference(r#"
+    module 0x1::m {
+        struct S { val: u8 }
+             //X
+        struct R { val: S }
+                      //^
+    }
+        "#)
+    }
 }
