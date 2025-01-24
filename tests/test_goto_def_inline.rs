@@ -707,4 +707,43 @@ mod tests {
     }
         "#, addrs)
     }
+
+    #[test]
+    fn test_resolve_fields_in_enum() {
+        // language=Move
+        test_resolve_reference(r#"
+    module 0x1::m {
+        struct Res { val: u8 }
+              //X
+        enum S { One { val: Res }}
+                          //^
+    }
+        "#)
+    }
+
+    #[test]
+    fn test_resolve_positional_fields() {
+        // language=Move
+        test_resolve_reference(r#"
+    module 0x1::m {
+        struct Res { val: u8 }
+              //X
+        struct S(Res);
+                 //^
+    }
+        "#)
+    }
+
+    #[test]
+    fn test_resolve_positional_fields_in_enum() {
+        // language=Move
+        test_resolve_reference(r#"
+    module 0x1::m {
+        struct Res { val: u8 }
+              //X
+        enum S { One(Res)}
+                    //^
+    }
+        "#)
+    }
 }
