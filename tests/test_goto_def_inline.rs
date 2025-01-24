@@ -593,6 +593,22 @@ mod tests {
         "#)
     }
 
+    #[ignore = "not implemented"]
+    #[test]
+    fn test_resolve_call_expr_from_inside_spec_block() {
+        // language=Move
+        test_resolve_reference(r#"
+    module 0x1::m {
+        fun main() {}
+            //X
+        spec module {
+            main();
+            //^
+        }
+    }
+        "#)
+    }
+
     #[ignore = "not implemented?"]
     #[test]
     fn test_resolve_struct_spec() {
