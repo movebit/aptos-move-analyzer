@@ -146,6 +146,7 @@ impl Project {
             manifest_load_failures: Default::default(),
             manifest_mod_time: Default::default(),
             global_env: Default::default(),
+            current_modifing_filepath: PathBuf::new(),
             current_modifing_file_content: Default::default(),
             targets: vec![],
             dependents: vec![],
@@ -200,6 +201,7 @@ impl Project {
             }
         };
 
+        self.current_modifing_filepath = file_path.clone();
         self.current_modifing_file_content = content;
         self.targets = new_project.targets.clone();
         self.dependents = new_project.dependents.clone();

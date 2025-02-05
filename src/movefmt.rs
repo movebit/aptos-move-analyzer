@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::context::*;
+// use crate::utils::path_concat;
 use lsp_server::*;
 use lsp_types::*;
 
@@ -46,13 +47,38 @@ pub fn on_movefmt_request(
     let parameters = serde_json::from_value::<DocumentFormattingParams>(request.params.clone())
         .expect("could not deserialize Reference request");
     let fpath = parameters.text_document.uri.to_file_path().unwrap();
+    eprintln!("fpath1 = {:?}", fpath);
+    // let fpath = path_concat(std::env::current_dir().unwrap().as_path(), fpath.as_path());
+    // eprintln!("fpath2 = {:?}", fpath);
+    let project = match context.projects.get_project(&fpath) {
+        Some(x) => x,
+        None => {
+            log::error!("project not found:{:?}", fpath.as_path());
+            return Response {
+                id: "".to_string().into(),
+                result: Some(serde_json::json!({"msg": "No available project"})),
+                error: None,
+            };
+        }
+    };
+    eprintln!(
+        "current_modifing_filepath = {:?}",
+        project.current_modifing_filepath
+    );
 
-    let content_origin = std::fs::read_to_string(&fpath).unwrap();
+    let content_origin = if project.current_modifing_filepath == fpath {
+        project.current_modifing_file_content.clone()
+    } else {
+        std::fs::read_to_string(&fpath).unwrap()
+    };
+    // let content_origin = std::fs::read_to_string(&fpath).unwrap();
     let mut movefmt_cfg = commentfmt::Config::default();
     movefmt_cfg.set().max_width(fmt_cfg.max_width as usize);
     movefmt_cfg.set().indent_size(fmt_cfg.indent_size as usize);
     let content_format =
         movefmt::core::fmt::format_entry(content_origin.clone(), movefmt_cfg).unwrap();
+
+    eprintln!("content_format = {}", content_format);
 
     let result_line =
         if content_format.clone().lines().count() >= content_origin.clone().lines().count() {
@@ -72,7 +98,7 @@ pub fn on_movefmt_request(
                 character: 0,
             },
         },
-        new_text: content_format,
+        new_text: content_format.clone(),
     }]);
     let r: Response = Response::new_ok(request.id.clone(), serde_json::to_value(result).unwrap());
 

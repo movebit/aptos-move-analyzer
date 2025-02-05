@@ -544,7 +544,11 @@ fn on_notification(context: &mut Context, notification: &Notification) {
                 }
             };
             clear_ui_diag(context, fpath.clone());
-            update_defs_on_changed(context, fpath.clone(), content);
+            update_defs_on_changed(context, fpath.clone(), content.clone());
+            let content_format =
+                movefmt::core::fmt::format_entry(content.clone(), commentfmt::Config::default())
+                    .unwrap();
+            let _ = std::fs::write(&fpath, content_format);
         }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
             use lsp_types::DidChangeTextDocumentParams;
