@@ -139,7 +139,7 @@ impl Handler {
             }
         }
 
-        let mut ret = Vec::with_capacity(2);
+        let mut ret = Vec::with_capacity(1);
         if let Some(x) = self.result.as_ref() {
             ret.push(x.mk_location());
             log::info!(
@@ -264,8 +264,6 @@ impl Handler {
                     codespan::Span::new(capture_span.start(), capture_span.end()),
                 );
 
-                log::info!("   {}", env.get_source(&span_loc).unwrap());
-
                 if crate::move_generate_spec_sel::ReqParametersPath::is_linecol_in_loc(
                     self.line, self.col, &span_loc, env,
                 ) {
@@ -333,9 +331,6 @@ impl Handler {
                 capture_items_loc = m_loc;
                 log::info!("find use decl member {}", target_stct_or_fn);
             }
-        } else {
-            target_stct_or_fn = module_name.to_string();
-            found_target_stct_or_fn = true;
         }
 
         let use_decl_module = env.get_modules().find(|m| {
@@ -379,8 +374,6 @@ impl Handler {
                 }
             }
         }
-
-        log::info!("find use decl module...");
         self.insert_result(env, &use_decl_module.get_loc(), &capture_items_loc);
         Some(())
     }
