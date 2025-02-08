@@ -232,8 +232,8 @@ async function maybeDownloadLspServer(): Promise<void> {
     userConfiguredAnalyzerLspPath !== dest_server_path
   ) {
     log.info('use lsp-server provided by the user');
-    fs.copyFileSync(userConfiguredAnalyzerLspPath, dest_server_path);
-    analyzerLspPath = dest_server_path;
+    // fs.copyFileSync(userConfiguredAnalyzerLspPath, dest_server_path);
+    analyzerLspPath = userConfiguredAnalyzerLspPath;
   } else {
     log.info('before ensureServerDownloaded');
     analyzerLspPath = await ensureServerDownloaded();
