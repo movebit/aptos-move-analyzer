@@ -198,7 +198,17 @@ fn handle_identifiers_for_coloncolon(
         .get(string_tokens.len() - 2)
         .unwrap()
         .to_string();
+
+    // env.get_modules().for_each(|module| {
+    //     let sym = module.get_name().name();
+    //     log::info!("env module name symbol: {}", env.symbol_pool().string(sym));
+    // });
+
     for module_env in env.get_modules() {
+        // log::info!(
+        //     "all module_env name: {}",
+        //     module_env.get_name().display(env).to_string()
+        // );
         if prefix_token_string == module_env.get_name().display(env).to_string() {
             for func_env in module_env.get_functions() {
                 result.push(completion_item(

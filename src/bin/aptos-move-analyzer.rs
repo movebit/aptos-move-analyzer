@@ -3,9 +3,9 @@
 
 use aptos_move_analyzer::{
     completion,
-    context::{Context, FileDiags},
-    goto_definition, hover, inlay_hints,
-    inlay_hints::*,
+    context::{Context, Debounce, FileDiags},
+    goto_definition, hover,
+    inlay_hints::{self, *},
     move_generate_spec_file::on_generate_spec_file,
     move_generate_spec_sel::on_generate_spec_sel,
     movefmt::*,
@@ -24,7 +24,7 @@ use lsp_types::{
     TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use move_command_line_common::files::FileHash;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 use url::Url;
 
 struct AnalyzerConfig {
@@ -89,6 +89,7 @@ fn main() {
         projects: MultiProject::new(),
         connection,
         diag_version: FileDiags::new(),
+        debounce: Debounce::new(1000),
     };
 
     let (id, _client_response) = context
@@ -547,6 +548,17 @@ fn on_notification(context: &mut Context, notification: &Notification) {
             update_defs_on_changed(context, fpath.clone(), content.clone());
         }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
+            let now = std::time::Instant::now();
+
+            if let Some(last_called) = context.debounce.last_called {
+                if now.duration_since(last_called) < context.debounce.delay {
+                    // 如果距离上次调用不够长，返回，不执行回调
+                    return;
+                }
+            }
+            // 设置上次调用时间
+            context.debounce.last_called = Some(now);
+
             use lsp_types::DidChangeTextDocumentParams;
             let parameters =
                 serde_json::from_value::<DidChangeTextDocumentParams>(notification.params.clone())

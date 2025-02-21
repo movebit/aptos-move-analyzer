@@ -3,7 +3,7 @@
 
 use crate::multiproject::MultiProject;
 use lsp_server::Connection;
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 /// The context within which the language server is running.
 pub struct Context {
@@ -11,6 +11,21 @@ pub struct Context {
     pub connection: Connection,
     pub projects: MultiProject,
     pub diag_version: FileDiags,
+    pub debounce: Debounce,
+}
+#[derive(Default)]
+pub struct Debounce {
+    pub delay: Duration,
+    pub last_called: Option<std::time::Instant>,
+}
+
+impl Debounce {
+    pub fn new(delay_ms: u64) -> Self {
+        Debounce {
+            delay: Duration::from_millis(delay_ms),
+            last_called: None,
+        }
+    }
 }
 
 #[derive(Default)]
