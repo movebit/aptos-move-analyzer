@@ -28,6 +28,8 @@ let analyzerLspPath: string | undefined;
 export async function activate(
   extensionContext: Readonly<vscode.ExtensionContext>,
 ): Promise<void> {
+
+  log.info('after change');
   const extension = new Extension();
   log.info(`${extension.identifier} version ${extension.version}`);
 
@@ -79,6 +81,15 @@ export async function activate(
   vscode.workspace.onDidChangeConfiguration(() => {
     log.info('reload_cfg ...  ');
     reload_cfg();
+  });
+
+  vscode.workspace.onDidChangeTextDocument(() => {
+    // if (e.document.fileName.includes("Move Analyzer Client")
+    // ) {
+    //   return;
+    // }
+    return;
+    // reload_cfg();
   });
 }
 

@@ -199,16 +199,24 @@ fn handle_identifiers_for_coloncolon(
         .unwrap()
         .to_string();
 
-    // env.get_modules().for_each(|module| {
-    //     let sym = module.get_name().name();
-    //     log::info!("env module name symbol: {}", env.symbol_pool().string(sym));
-    // });
+    match prefix_token_string.as_str() {
+        "std" | "aptos_std" | "aptos_framework" => {
+            env.get_modules().for_each(|module| {
+                if let move_model::ast::Address::Numerical(addr) = module.self_address() {
+                    if addr.to_standard_string() == "0x1" {
+                        result.push(completion_item(
+                            &module.get_name().display(&env).to_string(),
+                            CompletionItemKind::CLASS,
+                        ));
+                    }
+                }
+            });
+            return result;
+        }
+        _ => {}
+    };
 
     for module_env in env.get_modules() {
-        // log::info!(
-        //     "all module_env name: {}",
-        //     module_env.get_name().display(env).to_string()
-        // );
         if prefix_token_string == module_env.get_name().display(env).to_string() {
             for func_env in module_env.get_functions() {
                 result.push(completion_item(
@@ -240,6 +248,24 @@ fn handle_identifiers_for_coloncolon_item(
         .get(string_tokens.len() - 3)
         .unwrap()
         .to_string();
+
+    match prefix_token_string.as_str() {
+        "std" | "aptos_std" | "aptos_framework" => {
+            env.get_modules().for_each(|module| {
+                if let move_model::ast::Address::Numerical(addr) = module.self_address() {
+                    if addr.to_standard_string() == "0x1" {
+                        result.push(completion_item(
+                            &module.get_name().display(&env).to_string(),
+                            CompletionItemKind::CLASS,
+                        ));
+                    }
+                }
+            });
+            return result;
+        }
+        _ => {}
+    };
+
     let wanted_token_string = string_tokens.last().unwrap();
     for module_env in env.get_modules() {
         if prefix_token_string == module_env.get_name().display(env).to_string() {

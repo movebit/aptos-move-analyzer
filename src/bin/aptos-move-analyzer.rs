@@ -548,24 +548,12 @@ fn on_notification(context: &mut Context, notification: &Notification) {
             update_defs_on_changed(context, fpath.clone(), content.clone());
         }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
-            let now = std::time::Instant::now();
-
-            if let Some(last_called) = context.debounce.last_called {
-                if now.duration_since(last_called) < context.debounce.delay {
-                    // 如果距离上次调用不够长，返回，不执行回调
-                    return;
-                }
-            }
-            // 设置上次调用时间
-            context.debounce.last_called = Some(now);
-
             use lsp_types::DidChangeTextDocumentParams;
             let parameters =
                 serde_json::from_value::<DidChangeTextDocumentParams>(notification.params.clone())
                     .expect("could not deserialize DidChangeTextDocumentParams request");
             let fpath = parameters.text_document.uri.to_file_path().unwrap();
             let fpath = path_concat(&std::env::current_dir().unwrap(), &fpath);
-
             clear_ui_diag(context, fpath.clone());
             update_defs_on_changed(
                 context,
