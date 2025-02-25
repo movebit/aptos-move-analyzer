@@ -37,3 +37,12 @@
 - update formatting code feature
 - optimize code
 - add test cases and improve UT
+
+## 2025/2/25 v1.0.5
+- fix bug on The Field 'Server Path' of extension configure not work.[(#issue24)](https://github.com/movebit/aptos-move-analyzer/issues/24)
+- fix bug on go-to-definition for `use`. [(#issue21)](https://github.com/movebit/aptos-move-analyzer/issues/21)
+- fix bug on auto-complete for `std` or `aptos-framework`. [(#issue25)](https://github.com/movebit/aptos-move-analyzer/issues/25)
+- optimize speed on save file when `Ctrl+S`. [(#issue23)](https://github.com/movebit/aptos-move-analyzer/issues/23)
+- optimize speed on auto-complete. [(#issue26)](https://github.com/movebit/aptos-move-analyzer/issues/26)
+- optimize code
+
