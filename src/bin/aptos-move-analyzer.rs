@@ -462,10 +462,7 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
             code_str.push_str(line_vec[line_idx]);
             code_str.push_str("\n");
         }
-        log::error!(
-            "report diag code_str = {:?}",
-            format!("{}\n{}", err_msg, code_str)
-        );
+
         let d = lsp_types::Diagnostic {
             range: lsp_types::Range {
                 start: pos,
@@ -476,12 +473,13 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
             ..Default::default()
         };
         let url = url::Url::from_file_path(PathBuf::from(file_path).as_path()).unwrap();
-        result.insert(url, vec![d]);
+        result.entry(url)
+            .or_insert(Vec::new())
+            .push(d);
+        
     }
-    log::info!("report diag result = {:?}", result);
     for (k, v) in result.clone().into_iter() {
         let ds = lsp_types::PublishDiagnosticsParams::new(k.clone(), v, None);
-        log::info!("report diag ds = {:?}", serde_json::to_value(ds.clone()));
         context
             .connection
             .sender
