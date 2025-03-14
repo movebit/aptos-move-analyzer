@@ -323,7 +323,6 @@ fn clear_ui_diag(context: &mut Context, fpath: PathBuf) {
     let mut result: HashMap<Url, Vec<lsp_types::Diagnostic>> = HashMap::new();
     let diag_err = proj.err_diags.clone();
     let tokens: Vec<&str> = diag_err.as_str().split("error: ").collect();
-    log::info!("clear_ui_diag diag tokens.len = {:?}", tokens.len());
     for token in tokens {
         let line_vec = token.lines().collect_vec();
         if line_vec.len() < 3 {
@@ -331,7 +330,6 @@ fn clear_ui_diag(context: &mut Context, fpath: PathBuf) {
         }
         let err_msg = line_vec[0];
         let loc_str = line_vec[1];
-        log::error!("clear_ui_diag diag err_msg = {:?}", err_msg);
 
         let mut file_path = "";
         let mut pos = lsp_types::Position::default();
@@ -361,7 +359,6 @@ fn clear_ui_diag(context: &mut Context, fpath: PathBuf) {
                 pos = lsp_types::Position::new(line_num, col_num);
             }
         }
-        log::error!("clear_ui_diag diag file_path = {:?}", file_path);
 
         if file_path.is_empty() {
             continue;
@@ -372,10 +369,7 @@ fn clear_ui_diag(context: &mut Context, fpath: PathBuf) {
             code_str.push_str(line_vec[line_idx]);
             code_str.push_str("\n");
         }
-        log::error!(
-            "clear_ui_diag diag code_str = {:?}",
-            format!("{}\n{}", err_msg, code_str)
-        );
+
         let d = lsp_types::Diagnostic {
             range: lsp_types::Range {
                 start: pos,
