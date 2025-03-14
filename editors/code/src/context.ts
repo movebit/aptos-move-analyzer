@@ -4,21 +4,22 @@
 
 import type { Configuration } from './configuration';
 import * as vscode from 'vscode';
-import { CompletionContext as VCompletionContext, CompletionTriggerKind } from 'vscode';
+// import { CompletionContext as VCompletionContext, CompletionTriggerKind } from 'vscode';
 import * as lc from "vscode-languageclient/node";
 import { log } from './log';
 import { sync as commandExistsSync } from 'command-exists';
 import { IndentAction } from 'vscode';
+// import { info } from 'console';
 
-function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+// function sleep(ms: number): Promise<void> {
+//     return new Promise(resolve => setTimeout(resolve, ms));
+// }
 
 /** Information passed along to each VS Code command defined by this extension. */
 export class Context {
     // private completeTimer: NodeJS.Timeout | null;
-    private didChangeTimer: NodeJS.Timeout | null;
-    private lastChangeTime: number;
+    // private didChangeTimer: NodeJS.Timeout | null;
+    // private lastChangeTime: number;
     private client: lc.LanguageClient | undefined;
     private constructor(
         private readonly extensionContext: Readonly<vscode.ExtensionContext>,
@@ -26,8 +27,8 @@ export class Context {
         client: lc.LanguageClient | undefined = undefined,
     ) {
         this.client = client;
-        this.didChangeTimer = null;
-        this.lastChangeTime = 0;
+        // this.didChangeTimer = null;
+        // this.lastChangeTime = 0;
         // this.completeTimer = null;
     }
 
@@ -143,35 +144,49 @@ export class Context {
             clientOptions,
         );
 
-        client.middleware.didChange = (data, next) => {
-            const currentTime = Date.now();
-            if (currentTime - this.lastChangeTime < 1000) {
-                this.lastChangeTime = currentTime;
-                if (this.didChangeTimer) {
-                    clearTimeout(this.didChangeTimer);  // 重置定时器
-                }
-                this.didChangeTimer = setTimeout(() => {
-                    next(data);  
-                    this.didChangeTimer = null;  
-                }, 800);
-                return Promise.resolve();
-            }
+        // client.middleware.didChange = (data, next) => {
+        //     const currentTime = Date.now();
+        //     if (currentTime - this.lastChangeTime < 1000) {
+        //         this.lastChangeTime = currentTime;
+        //         if (this.didChangeTimer) {
+        //             clearTimeout(this.didChangeTimer);  // 重置定时器
+        //         }
+        //         this.didChangeTimer = setTimeout(() => {
+        //             next(data);  
+        //             this.didChangeTimer = null;  
+        //         }, 800);
+        //         return Promise.resolve();
+        //     }
 
-            this.lastChangeTime = currentTime;
-            return next(data);
-        };
+        //     this.lastChangeTime = currentTime;
+        //     return next(data);
+        // };
         
-        client.middleware.provideCompletionItem = async (
-            document, position, context, token, next
+        // vscode.workspace.onDidChangeTextDocument(event => {
+        //     console.log(`[Document Change] ${event.document.uri.toString()}`);
+        //     console.log(`Changes:`, event.contentChanges);
+        // });
+        // // vscode.workspace.applyEdit
+
+        // client.middleware.provideCompletionItem = async (
+        //     document, position, context, token, next
+        // ) => {
+        //     const myContext : VCompletionContext = {
+        //         triggerKind: CompletionTriggerKind.TriggerCharacter,
+        //         triggerCharacter: context.triggerCharacter,
+        //     }
+        //     await sleep(800);
+        //     return next(document, position, myContext, token);
+        // }
+        
+        client.middleware.provideDocumentFormattingEdits = async (
+            document, options, token, next
         ) => {
-            const myContext : VCompletionContext = {
-                triggerKind: CompletionTriggerKind.TriggerCharacter,
-                triggerCharacter: context.triggerCharacter,
-            }
-            await sleep(800);
-            return next(document, position, myContext, token);
+            // await sleep(1000);
+            // document.save();
+            return next(document, options, token);
         }
-        
+
         log.info('Starting client...');
         client.start();
         this.client = client;
