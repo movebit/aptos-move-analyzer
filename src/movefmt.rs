@@ -64,44 +64,94 @@ pub fn on_movefmt_request(
         project.current_modifing_filepath
     );
 
-    let content_origin = if project.current_modifing_filepath == fpath {
-        project.current_modifing_file_content.clone()
-    } else {
-        std::fs::read_to_string(&fpath).unwrap()
-    };
-    // let content_origin = std::fs::read_to_string(&fpath).unwrap();
+    // let content_origin = if project.current_modifing_filepath == fpath {
+    //     project.current_modifing_file_content.clone()
+    // } else {
+    //    std::fs::read_to_string(&fpath).unwrap()
+    // };
+    let content_origin = std::fs::read_to_string(&fpath).unwrap();
+    log::info!(
+        "current_modifing_filepath = {:?}",
+        project.current_modifing_filepath
+    );
     let mut movefmt_cfg = commentfmt::Config::default();
+    log::info!(
+        "current_modifing_filepath = {:?}",
+        project.current_modifing_filepath
+    );
     movefmt_cfg.set().max_width(fmt_cfg.max_width as usize);
+    log::info!(
+        "current_modifing_filepath = {:?}",
+        project.current_modifing_filepath
+    );
     movefmt_cfg.set().indent_size(fmt_cfg.indent_size as usize);
+    log::info!(
+        "current_modifing_filepath = {:?}",
+        project.current_modifing_filepath
+    );
     let content_format =
         movefmt::core::fmt::format_entry(content_origin.clone(), movefmt_cfg);
-    
+    log::info!(
+        "current_modifing_filepath = {:?}",
+        project.current_modifing_filepath
+    );
     if content_format.is_err() {
-        return Response::new_err(request.id.clone(), -1, "format failed".to_string());
+        let r = Response::new_err(request.id.clone(), -1, "format failed".to_string());
+        context
+            .connection
+            .sender
+            .send(Message::Response(r.clone()))
+            .unwrap();
+        return r;
     }
-
+    log::info!(
+        "current_modifing_filepath = {:?}",
+        project.current_modifing_filepath
+    );
     let content_format = content_format.unwrap();
-    let result_line =
-        if content_format.clone().lines().count() >= content_origin.clone().lines().count() {
-            content_format.clone().lines().count()
-        } else {
-            content_origin.clone().lines().count()
-        };
+    log::info!("format result: {}", content_format);
 
-    let result = Some(vec![TextEdit {
+    let mut text_edits = vec![];
+
+
+    let before_line = content_origin.clone().lines().count();
+    let after_line = content_format.clone().lines().count();
+
+    text_edits.push(TextEdit {
         range: lsp_types::Range {
             start: Position {
                 line: 0,
                 character: 0,
             },
             end: Position {
-                line: result_line as u32,
+                line: after_line as u32,
                 character: 0,
             },
         },
         new_text: content_format.clone(),
-    }]);
-    let r: Response = Response::new_ok(request.id.clone(), serde_json::to_value(result).unwrap());
+    });
+
+    if before_line > after_line {
+        text_edits.push(TextEdit {
+            range: lsp_types::Range {
+                start: Position {
+                    line: (after_line + 1) as u32,
+                    character: 0,
+                },
+                end: Position {
+                    line: before_line as u32,
+                    character: 0,
+                },
+            },
+            new_text: "".to_string(),
+        });
+    }
+   
+
+    let r: Response = Response::new_ok(
+        request.id.clone(),
+         serde_json::to_value(Some(text_edits)).unwrap()
+    );
 
     context
         .connection
