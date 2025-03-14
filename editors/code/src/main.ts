@@ -82,15 +82,6 @@ export async function activate(
     log.info('reload_cfg ...  ');
     reload_cfg();
   });
-
-  vscode.workspace.onDidChangeTextDocument(() => {
-    // if (e.document.fileName.includes("Move Analyzer Client")
-    // ) {
-    //   return;
-    // }
-    return;
-    // reload_cfg();
-  });
 }
 
 function updateStatus(status: LspStatus, extraInfo?: string) {

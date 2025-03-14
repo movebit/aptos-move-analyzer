@@ -536,16 +536,22 @@ fn on_notification(context: &mut Context, notification: &Notification) {
                     return;
                 }
             };
+
+            log::info!("did save text document: {}", content);
+
             clear_ui_diag(context, fpath.clone());
             update_defs_on_changed(context, fpath.clone(), content.clone());
         }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
+            log::info!("did change text doc");
             use lsp_types::DidChangeTextDocumentParams;
             let parameters =
                 serde_json::from_value::<DidChangeTextDocumentParams>(notification.params.clone())
                     .expect("could not deserialize DidChangeTextDocumentParams request");
             let fpath = parameters.text_document.uri.to_file_path().unwrap();
             let fpath = path_concat(&std::env::current_dir().unwrap(), &fpath);
+            
+            log::info!("did change text document: {}", parameters.content_changes.last().unwrap().text.clone());
             clear_ui_diag(context, fpath.clone());
             update_defs_on_changed(
                 context,
