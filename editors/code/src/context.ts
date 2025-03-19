@@ -130,7 +130,7 @@ export class Context {
         // that is 'Move Language Server'). For more information, see:
         // https://code.visualstudio.com/api/language-extensions/language-server-extension-guide#logging-support-for-language-server
         const traceOutputChannel = vscode.window.createOutputChannel(
-            'Move Analyzer Language Server Trace',
+            'Aptos Move Analyzer Language Server Trace',
         );
         const clientOptions: lc.LanguageClientOptions = {
             documentSelector: [{ scheme: 'file', language: 'move' }],
