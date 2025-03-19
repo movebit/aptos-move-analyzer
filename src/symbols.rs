@@ -79,7 +79,7 @@ pub fn on_document_symbol_request(context: &Context, request: &Request) -> lsp_s
         Some(x) => x,
         None => {
             log::error!(
-                "coule not found valid project from file path, fpath = {:?}",
+                "coule not found valid project from file path for symbol in outline, fpath = {:?}",
                 fpath.as_path()
             );
             return lsp_server::Response {
