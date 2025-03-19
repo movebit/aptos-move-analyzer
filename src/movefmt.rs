@@ -75,20 +75,8 @@ pub fn on_movefmt_request(
         project.current_modifing_filepath
     );
     let mut movefmt_cfg = commentfmt::Config::default();
-    log::info!(
-        "current_modifing_filepath = {:?}",
-        project.current_modifing_filepath
-    );
     movefmt_cfg.set().max_width(fmt_cfg.max_width as usize);
-    log::info!(
-        "current_modifing_filepath = {:?}",
-        project.current_modifing_filepath
-    );
     movefmt_cfg.set().indent_size(fmt_cfg.indent_size as usize);
-    log::info!(
-        "current_modifing_filepath = {:?}",
-        project.current_modifing_filepath
-    );
     let content_format =
         movefmt::core::fmt::format_entry(content_origin.clone(), movefmt_cfg);
     log::info!(
