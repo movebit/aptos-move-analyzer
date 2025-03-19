@@ -191,9 +191,9 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
         lsp_types::request::DocumentSymbolRequest::METHOD => {
             symbols::on_document_symbol_request(context, request);
         }
-        // lsp_types::request::Formatting::METHOD => {
-        //     on_movefmt_request(context, request, &analyzer_cfg.movefmt_config);
-        // }
+        lsp_types::request::Formatting::METHOD => {
+            // on_movefmt_request(context, request, &analyzer_cfg.movefmt_config);
+        }
         "move/generate/spec/file" => {
             on_generate_spec_file(context, request, true);
         }
@@ -536,9 +536,20 @@ fn on_notification(context: &mut Context, notification: &Notification) {
                     return;
                 }
             };
+            // if let Some(content) = parameters.text {
+            //     log::info!("{:?}", content.len());
+            // }
+            // log::info!("did save text document: {}", content.len());
 
-            log::info!("did save text document: {}", content);
-
+            let mut movefmt_cfg = commentfmt::Config::default();
+            let content = if let Ok(content_format) =
+            movefmt::core::fmt::format_entry(content.clone(), movefmt_cfg) {
+                std::fs::write(fpath.as_path(), content_format.clone());
+                content_format
+            } else {
+                content
+            };
+            
             clear_ui_diag(context, fpath.clone());
             update_defs_on_changed(context, fpath.clone(), content.clone());
         }
