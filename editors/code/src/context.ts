@@ -179,13 +179,13 @@ export class Context {
         //     return next(document, position, myContext, token);
         // }
         
-        client.middleware.provideDocumentFormattingEdits = async (
-            document, options, token, next
-        ) => {
-            // await sleep(1000);
-            // document.save();
-            return next(document, options, token);
-        }
+        // client.middleware.provideDocumentFormattingEdits = async (
+        //     document, options, token, next
+        // ) => {
+        //     // await sleep(1000);
+        //     // document.save();
+        //     return next(document, options, token);
+        // }
 
         log.info('Starting client...');
         client.start();
