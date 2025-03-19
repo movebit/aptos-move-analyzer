@@ -128,6 +128,9 @@ fn main() {
         definition_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
+        document_formatting_provider: None, // 没有提供格式化功能
+        document_range_formatting_provider: None,
+        document_on_type_formatting_provider: None,
         ..Default::default()
     })
     .expect("could not serialize server capabilities");
@@ -191,9 +194,9 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
         lsp_types::request::DocumentSymbolRequest::METHOD => {
             symbols::on_document_symbol_request(context, request);
         }
-        lsp_types::request::Formatting::METHOD => {
-            // on_movefmt_request(context, request, &analyzer_cfg.movefmt_config);
-        }
+        // lsp_types::request::Formatting::METHOD => {
+        //     // on_movefmt_request(context, request, &analyzer_cfg.movefmt_config);
+        // }
         "move/generate/spec/file" => {
             on_generate_spec_file(context, request, true);
         }
