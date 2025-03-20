@@ -11,7 +11,6 @@ pub struct Context {
     pub connection: Connection,
     pub projects: MultiProject,
     pub diag_version: FileDiags,
-    pub debounce: Debounce,
 }
 #[derive(Default)]
 pub struct Debounce {

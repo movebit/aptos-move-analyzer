@@ -4,22 +4,23 @@
 
 import type { Configuration } from './configuration';
 import * as vscode from 'vscode';
-import { CompletionContext as VCompletionContext, CompletionTriggerKind } from 'vscode';
+// import { CompletionContext as VCompletionContext, CompletionTriggerKind } from 'vscode';
 import * as lc from "vscode-languageclient/node";
 import { log } from './log';
 import { sync as commandExistsSync } from 'command-exists';
 import { IndentAction } from 'vscode';
+// import { info } from 'console';
 
-function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+// function sleep(ms: number): Promise<void> {
+//     return new Promise(resolve => setTimeout(resolve, ms));
+// }
 
 /** Information passed along to each VS Code command defined by this extension. */
 export class Context {
-    // private completeTimer: NodeJS.Timeout | null;
     private didChangeTimer: NodeJS.Timeout | null;
     private lastChangeTime: number;
     private client: lc.LanguageClient | undefined;
+    private didchange: boolean;
     private constructor(
         private readonly extensionContext: Readonly<vscode.ExtensionContext>,
         readonly configuration: Readonly<Configuration>,
@@ -28,7 +29,7 @@ export class Context {
         this.client = client;
         this.didChangeTimer = null;
         this.lastChangeTime = 0;
-        // this.completeTimer = null;
+        this.didchange = false;
     }
 
     static create(
@@ -129,7 +130,7 @@ export class Context {
         // that is 'Move Language Server'). For more information, see:
         // https://code.visualstudio.com/api/language-extensions/language-server-extension-guide#logging-support-for-language-server
         const traceOutputChannel = vscode.window.createOutputChannel(
-            'Move Analyzer Language Server Trace',
+            'Aptos Move Analyzer Language Server Trace',
         );
         const clientOptions: lc.LanguageClientOptions = {
             documentSelector: [{ scheme: 'file', language: 'move' }],
@@ -148,30 +149,40 @@ export class Context {
             if (currentTime - this.lastChangeTime < 1000) {
                 this.lastChangeTime = currentTime;
                 if (this.didChangeTimer) {
-                    clearTimeout(this.didChangeTimer);  // 重置定时器
+                    clearTimeout(this.didChangeTimer);  // clear the previous timer
+                    this.didChangeTimer = null;
                 }
                 this.didChangeTimer = setTimeout(() => {
                     next(data);  
+                    this.didchange = true;
                     this.didChangeTimer = null;  
                 }, 800);
                 return Promise.resolve();
             }
 
             this.lastChangeTime = currentTime;
-            return next(data);
+            // return next(data);
+            return Promise.resolve();
         };
-        
+
         client.middleware.provideCompletionItem = async (
             document, position, context, token, next
         ) => {
-            const myContext : VCompletionContext = {
-                triggerKind: CompletionTriggerKind.TriggerCharacter,
-                triggerCharacter: context.triggerCharacter,
+            if (this.didchange) {
+                return next(document, position, context, token);
+            } else {
+                return null;
             }
-            await sleep(800);
-            return next(document, position, myContext, token);
         }
         
+        client.middleware.willSave = (data, next) => {
+            if (this.didChangeTimer) {
+                clearTimeout(this.didChangeTimer);  // clear the previous timer
+                this.didChangeTimer = null;
+            }
+            return next(data);
+        };
+
         log.info('Starting client...');
         client.start();
         this.client = client;
@@ -190,3 +201,7 @@ export class Context {
         return this.client;
     }
 } // Context
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
