@@ -20,10 +20,13 @@ use log::{Level, Metadata, Record};
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
     notification::Notification as _, request::Request as _, CompletionOptions,
-    HoverProviderCapability, OneOf, SaveOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, WorkDoneProgressOptions,
+    DidSaveTextDocumentParams, HoverProviderCapability, OneOf, SaveOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    WorkDoneProgressOptions,
 };
 use move_command_line_common::files::FileHash;
+use move_compiler::diag;
+use move_core_types::effects::Op;
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 use url::Url;
 
@@ -159,7 +162,7 @@ fn main() {
                                 // It ought to, especially once it begins processing requests that may
                                 // take a long time to respond to.
                             }
-                            _ => on_notification(&mut context, &notification),
+                            _ => on_notification(&mut context, &notification, &analyzer_cfg),
                         }
                     }
                     Err(error) => log::error!("IDE message error: {:?}", error),
@@ -493,7 +496,11 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
     }
 }
 
-fn on_notification(context: &mut Context, notification: &Notification) {
+fn on_notification(
+    context: &mut Context,
+    notification: &Notification,
+    analyzer_cfg: &AnalyzerConfig,
+) {
     fn update_defs_on_changed(context: &mut Context, fpath: PathBuf, content: String) {
         let file_hash = FileHash::new(content.as_str());
         context.projects.update_defs(fpath.clone(), content.clone());
@@ -520,45 +527,17 @@ fn on_notification(context: &mut Context, notification: &Notification) {
                     .expect("could not deserialize DidSaveTextDocumentParams request");
             let fpath = parameters.text_document.uri.to_file_path().unwrap();
             let fpath = path_concat(&std::env::current_dir().unwrap(), &fpath);
-            let content = std::fs::read_to_string(fpath.as_path());
-            let content = match content {
-                Ok(x) => x,
-                Err(err) => {
-                    log::error!("read file failed,err:{:?}", err);
-                    return;
-                }
-            };
-            // if let Some(content) = parameters.text {
-            //     log::info!("{:?}", content.len());
-            // }
-            // log::info!("did save text document: {}", content.len());
-
-            let mut movefmt_cfg = commentfmt::Config::default();
-            let content = if let Ok(content_format) =
-                movefmt::core::fmt::format_entry(content.clone(), movefmt_cfg)
-            {
-                std::fs::write(fpath.as_path(), content_format.clone());
-                content_format
-            } else {
-                content
-            };
-
+            let content = format_on_did_save(&fpath, parameters.text, &analyzer_cfg);
             clear_ui_diag(context, fpath.clone());
-            update_defs_on_changed(context, fpath.clone(), content.clone());
+            update_defs_on_changed(context, fpath.clone(), content);
         }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
-            log::info!("did change text doc");
             use lsp_types::DidChangeTextDocumentParams;
             let parameters =
                 serde_json::from_value::<DidChangeTextDocumentParams>(notification.params.clone())
                     .expect("could not deserialize DidChangeTextDocumentParams request");
             let fpath = parameters.text_document.uri.to_file_path().unwrap();
             let fpath = path_concat(&std::env::current_dir().unwrap(), &fpath);
-
-            log::info!(
-                "did change text document: {}",
-                parameters.content_changes.last().unwrap().text.clone()
-            );
             clear_ui_diag(context, fpath.clone());
             update_defs_on_changed(
                 context,
@@ -659,4 +638,43 @@ fn send_not_project_file_error(context: &mut Context, fpath: PathBuf, is_open: b
             params: serde_json::to_value(ds).unwrap(),
         }))
         .unwrap();
+}
+
+fn format_on_did_save(
+    fpath: &PathBuf,
+    text: Option<String>,
+    analyzer_cfg: &AnalyzerConfig,
+) -> String {
+    let file_content = if let Some(content) = text {
+        content
+    } else {
+        std::fs::read_to_string(fpath).unwrap()
+    };
+
+    if !analyzer_cfg.movefmt_config.enable {
+        return file_content;
+    }
+
+    let mut movefmt_cfg = commentfmt::Config::default();
+    movefmt_cfg
+        .set()
+        .max_width(analyzer_cfg.movefmt_config.max_width as usize);
+    movefmt_cfg
+        .set()
+        .indent_size(analyzer_cfg.movefmt_config.indent_size as usize);
+
+    match movefmt::core::fmt::format_entry(file_content.clone(), movefmt_cfg) {
+        Ok(result) => {
+            if let Err(err) = std::fs::write(fpath.as_path(), result.clone()) {
+                log::error!("write file failed, err: {:?}", err);
+                file_content
+            } else {
+                result
+            }
+        }
+        Err(err) => {
+            log::error!("format file failed, err: {:?}", err);
+            file_content
+        }
+    }
 }
