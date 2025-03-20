@@ -521,6 +521,7 @@ fn on_notification(
 
     match notification.method.as_str() {
         lsp_types::notification::DidSaveTextDocument::METHOD => {
+            log::info!("call did save");
             use lsp_types::DidSaveTextDocumentParams;
             let parameters =
                 serde_json::from_value::<DidSaveTextDocumentParams>(notification.params.clone())
@@ -532,6 +533,7 @@ fn on_notification(
             update_defs_on_changed(context, fpath.clone(), content);
         }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
+            log::info!("call did change");
             use lsp_types::DidChangeTextDocumentParams;
             let parameters =
                 serde_json::from_value::<DidChangeTextDocumentParams>(notification.params.clone())

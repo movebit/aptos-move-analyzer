@@ -17,9 +17,9 @@ import { IndentAction } from 'vscode';
 
 /** Information passed along to each VS Code command defined by this extension. */
 export class Context {
-    // private completeTimer: NodeJS.Timeout | null;
-    // private didChangeTimer: NodeJS.Timeout | null;
-    // private lastChangeTime: number;
+    private completeTimer: NodeJS.Timeout | null;
+    private didChangeTimer: NodeJS.Timeout | null;
+    private lastChangeTime: number;
     private client: lc.LanguageClient | undefined;
     private constructor(
         private readonly extensionContext: Readonly<vscode.ExtensionContext>,
@@ -27,9 +27,9 @@ export class Context {
         client: lc.LanguageClient | undefined = undefined,
     ) {
         this.client = client;
-        // this.didChangeTimer = null;
-        // this.lastChangeTime = 0;
-        // this.completeTimer = null;
+        this.didChangeTimer = null;
+        this.lastChangeTime = 0;
+        this.completeTimer = null;
     }
 
     static create(
@@ -144,29 +144,33 @@ export class Context {
             clientOptions,
         );
 
-        // client.middleware.didChange = (data, next) => {
-        //     const currentTime = Date.now();
-        //     if (currentTime - this.lastChangeTime < 1000) {
-        //         this.lastChangeTime = currentTime;
-        //         if (this.didChangeTimer) {
-        //             clearTimeout(this.didChangeTimer);  // 重置定时器
-        //         }
-        //         this.didChangeTimer = setTimeout(() => {
-        //             next(data);  
-        //             this.didChangeTimer = null;  
-        //         }, 800);
-        //         return Promise.resolve();
-        //     }
+        client.middleware.didChange = (data, next) => {
+            const currentTime = Date.now();
+            if (currentTime - this.lastChangeTime < 1000) {
+                this.lastChangeTime = currentTime;
+                if (this.didChangeTimer) {
+                    clearTimeout(this.didChangeTimer);  // clear the previous timer
+                    this.didChangeTimer = null;
+                }
+                this.didChangeTimer = setTimeout(() => {
+                    next(data);  
+                    this.didChangeTimer = null;  
+                }, 800);
+                return Promise.resolve();
+            }
 
-        //     this.lastChangeTime = currentTime;
-        //     return next(data);
-        // };
-        
-        // vscode.workspace.onDidChangeTextDocument(event => {
-        //     console.log(`[Document Change] ${event.document.uri.toString()}`);
-        //     console.log(`Changes:`, event.contentChanges);
-        // });
-        // // vscode.workspace.applyEdit
+            this.lastChangeTime = currentTime;
+            // return next(data);
+            return Promise.resolve();
+        };
+
+        client.middleware.willSave = (data, next) => {
+            if (this.didChangeTimer) {
+                clearTimeout(this.didChangeTimer);  // clear the previous timer
+                this.didChangeTimer = null;
+            }
+            return next(data);
+        };
 
         // client.middleware.provideCompletionItem = async (
         //     document, position, context, token, next
