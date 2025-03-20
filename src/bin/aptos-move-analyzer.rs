@@ -193,6 +193,9 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
             symbols::on_document_symbol_request(context, request);
         }
         lsp_types::request::Formatting::METHOD => {
+            // This handler needs to be kept to handle a bug
+            // where the client keeps waiting for the analyzer to return formatting results
+            // when 'format on save' is enabled in VSCode settings
             on_movefmt_request(context, request, &analyzer_cfg.movefmt_config);
         }
         "move/generate/spec/file" => {
