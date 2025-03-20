@@ -229,15 +229,6 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
                     }))
                     .unwrap();
                 eprintln!("--------------------- unregister inlay_hint ---------------------");
-                // context
-                //     .connection
-                //     .sender
-                //     .send(lsp_server::Message::Request(Request{
-                //         id: "inlay_hints".to_string().into(),
-                //         method: lsp_types::request::InlayHintRefreshRequest::METHOD.to_string(),
-                //         params: serde_json::json!({}),
-                //     })).unwrap();
-                // eprintln!("--------------------- refresh inlay_hint ---------------------");
             } else {
                 let params = lsp_types::RegistrationParams {
                     registrations: vec![lsp_types::Registration {
