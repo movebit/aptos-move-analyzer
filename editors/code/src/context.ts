@@ -17,7 +17,6 @@ import { IndentAction } from 'vscode';
 
 /** Information passed along to each VS Code command defined by this extension. */
 export class Context {
-    private completeTimer: NodeJS.Timeout | null;
     private didChangeTimer: NodeJS.Timeout | null;
     private lastChangeTime: number;
     private client: lc.LanguageClient | undefined;
@@ -29,7 +28,6 @@ export class Context {
         this.client = client;
         this.didChangeTimer = null;
         this.lastChangeTime = 0;
-        this.completeTimer = null;
     }
 
     static create(
@@ -164,6 +162,13 @@ export class Context {
             return Promise.resolve();
         };
 
+        client.middleware.provideCompletionItem = async (
+            document, position, context, token, next
+        ) => {
+            await sleep(800);
+            return next(document, position, context, token);
+        }
+        
         client.middleware.willSave = (data, next) => {
             if (this.didChangeTimer) {
                 clearTimeout(this.didChangeTimer);  // clear the previous timer
@@ -172,17 +177,6 @@ export class Context {
             return next(data);
         };
 
-        // client.middleware.provideCompletionItem = async (
-        //     document, position, context, token, next
-        // ) => {
-        //     const myContext : VCompletionContext = {
-        //         triggerKind: CompletionTriggerKind.TriggerCharacter,
-        //         triggerCharacter: context.triggerCharacter,
-        //     }
-        //     await sleep(800);
-        //     return next(document, position, myContext, token);
-        // }
-        
         // client.middleware.provideDocumentFormattingEdits = async (
         //     document, options, token, next
         // ) => {
@@ -209,3 +203,7 @@ export class Context {
         return this.client;
     }
 } // Context
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
