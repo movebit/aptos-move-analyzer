@@ -89,7 +89,6 @@ fn main() {
         projects: MultiProject::new(),
         connection,
         diag_version: FileDiags::new(),
-        debounce: Debounce::new(1000),
     };
 
     let (id, _client_response) = context
@@ -470,10 +469,7 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
             ..Default::default()
         };
         let url = url::Url::from_file_path(PathBuf::from(file_path).as_path()).unwrap();
-        result.entry(url)
-            .or_insert(Vec::new())
-            .push(d);
-        
+        result.entry(url).or_insert(Vec::new()).push(d);
     }
     for (k, v) in result.clone().into_iter() {
         let ds = lsp_types::PublishDiagnosticsParams::new(k.clone(), v, None);
@@ -546,13 +542,14 @@ fn on_notification(context: &mut Context, notification: &Notification) {
 
             let mut movefmt_cfg = commentfmt::Config::default();
             let content = if let Ok(content_format) =
-            movefmt::core::fmt::format_entry(content.clone(), movefmt_cfg) {
+                movefmt::core::fmt::format_entry(content.clone(), movefmt_cfg)
+            {
                 std::fs::write(fpath.as_path(), content_format.clone());
                 content_format
             } else {
                 content
             };
-            
+
             clear_ui_diag(context, fpath.clone());
             update_defs_on_changed(context, fpath.clone(), content.clone());
         }
@@ -564,8 +561,11 @@ fn on_notification(context: &mut Context, notification: &Notification) {
                     .expect("could not deserialize DidChangeTextDocumentParams request");
             let fpath = parameters.text_document.uri.to_file_path().unwrap();
             let fpath = path_concat(&std::env::current_dir().unwrap(), &fpath);
-            
-            log::info!("did change text document: {}", parameters.content_changes.last().unwrap().text.clone());
+
+            log::info!(
+                "did change text document: {}",
+                parameters.content_changes.last().unwrap().text.clone()
+            );
             clear_ui_diag(context, fpath.clone());
             update_defs_on_changed(
                 context,
