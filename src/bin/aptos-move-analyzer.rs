@@ -173,7 +173,6 @@ fn main() {
 }
 
 fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut AnalyzerConfig) {
-    // log::info!("aptos receive method:{}", request.method.as_str());
     match request.method.as_str() {
         lsp_types::request::GotoDefinition::METHOD => {
             goto_definition::on_go_to_def_request(context, request);
@@ -193,9 +192,9 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
         lsp_types::request::DocumentSymbolRequest::METHOD => {
             symbols::on_document_symbol_request(context, request);
         }
-        // lsp_types::request::Formatting::METHOD => {
-        //     // on_movefmt_request(context, request, &analyzer_cfg.movefmt_config);
-        // }
+        lsp_types::request::Formatting::METHOD => {
+            on_movefmt_request(context, request, &analyzer_cfg.movefmt_config);
+        }
         "move/generate/spec/file" => {
             on_generate_spec_file(context, request, true);
         }
