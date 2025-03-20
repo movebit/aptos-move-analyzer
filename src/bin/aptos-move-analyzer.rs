@@ -20,10 +20,13 @@ use log::{Level, Metadata, Record};
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
     notification::Notification as _, request::Request as _, CompletionOptions,
-    HoverProviderCapability, OneOf, SaveOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, WorkDoneProgressOptions,
+    DidSaveTextDocumentParams, HoverProviderCapability, OneOf, SaveOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    WorkDoneProgressOptions,
 };
 use move_command_line_common::files::FileHash;
+use move_compiler::diag;
+use move_core_types::effects::Op;
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 use url::Url;
 
@@ -89,7 +92,6 @@ fn main() {
         projects: MultiProject::new(),
         connection,
         diag_version: FileDiags::new(),
-        debounce: Debounce::new(1000),
     };
 
     let (id, _client_response) = context
@@ -128,6 +130,9 @@ fn main() {
         definition_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
+        document_formatting_provider: None, // 没有提供格式化功能
+        document_range_formatting_provider: None,
+        document_on_type_formatting_provider: None,
         ..Default::default()
     })
     .expect("could not serialize server capabilities");
@@ -157,7 +162,7 @@ fn main() {
                                 // It ought to, especially once it begins processing requests that may
                                 // take a long time to respond to.
                             }
-                            _ => on_notification(&mut context, &notification),
+                            _ => on_notification(&mut context, &notification, &analyzer_cfg),
                         }
                     }
                     Err(error) => log::error!("IDE message error: {:?}", error),
@@ -171,7 +176,6 @@ fn main() {
 }
 
 fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut AnalyzerConfig) {
-    // log::info!("aptos receive method:{}", request.method.as_str());
     match request.method.as_str() {
         lsp_types::request::GotoDefinition::METHOD => {
             goto_definition::on_go_to_def_request(context, request);
@@ -192,6 +196,9 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
             symbols::on_document_symbol_request(context, request);
         }
         lsp_types::request::Formatting::METHOD => {
+            // This handler needs to be kept to handle a bug
+            // where the client keeps waiting for the analyzer to return formatting results
+            // when 'format on save' is enabled in VSCode settings
             on_movefmt_request(context, request, &analyzer_cfg.movefmt_config);
         }
         "move/generate/spec/file" => {
@@ -227,15 +234,6 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
                     }))
                     .unwrap();
                 eprintln!("--------------------- unregister inlay_hint ---------------------");
-                // context
-                //     .connection
-                //     .sender
-                //     .send(lsp_server::Message::Request(Request{
-                //         id: "inlay_hints".to_string().into(),
-                //         method: lsp_types::request::InlayHintRefreshRequest::METHOD.to_string(),
-                //         params: serde_json::json!({}),
-                //     })).unwrap();
-                // eprintln!("--------------------- refresh inlay_hint ---------------------");
             } else {
                 let params = lsp_types::RegistrationParams {
                     registrations: vec![lsp_types::Registration {
@@ -323,7 +321,6 @@ fn clear_ui_diag(context: &mut Context, fpath: PathBuf) {
     let mut result: HashMap<Url, Vec<lsp_types::Diagnostic>> = HashMap::new();
     let diag_err = proj.err_diags.clone();
     let tokens: Vec<&str> = diag_err.as_str().split("error: ").collect();
-    log::info!("clear_ui_diag diag tokens.len = {:?}", tokens.len());
     for token in tokens {
         let line_vec = token.lines().collect_vec();
         if line_vec.len() < 3 {
@@ -331,7 +328,6 @@ fn clear_ui_diag(context: &mut Context, fpath: PathBuf) {
         }
         let err_msg = line_vec[0];
         let loc_str = line_vec[1];
-        log::error!("clear_ui_diag diag err_msg = {:?}", err_msg);
 
         let mut file_path = "";
         let mut pos = lsp_types::Position::default();
@@ -361,7 +357,6 @@ fn clear_ui_diag(context: &mut Context, fpath: PathBuf) {
                 pos = lsp_types::Position::new(line_num, col_num);
             }
         }
-        log::error!("clear_ui_diag diag file_path = {:?}", file_path);
 
         if file_path.is_empty() {
             continue;
@@ -372,10 +367,7 @@ fn clear_ui_diag(context: &mut Context, fpath: PathBuf) {
             code_str.push_str(line_vec[line_idx]);
             code_str.push_str("\n");
         }
-        log::error!(
-            "clear_ui_diag diag code_str = {:?}",
-            format!("{}\n{}", err_msg, code_str)
-        );
+
         let d = lsp_types::Diagnostic {
             range: lsp_types::Range {
                 start: pos,
@@ -462,10 +454,7 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
             code_str.push_str(line_vec[line_idx]);
             code_str.push_str("\n");
         }
-        log::error!(
-            "report diag code_str = {:?}",
-            format!("{}\n{}", err_msg, code_str)
-        );
+
         let d = lsp_types::Diagnostic {
             range: lsp_types::Range {
                 start: pos,
@@ -476,12 +465,10 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
             ..Default::default()
         };
         let url = url::Url::from_file_path(PathBuf::from(file_path).as_path()).unwrap();
-        result.insert(url, vec![d]);
+        result.entry(url).or_insert(Vec::new()).push(d);
     }
-    log::info!("report diag result = {:?}", result);
     for (k, v) in result.clone().into_iter() {
         let ds = lsp_types::PublishDiagnosticsParams::new(k.clone(), v, None);
-        log::info!("report diag ds = {:?}", serde_json::to_value(ds.clone()));
         context
             .connection
             .sender
@@ -509,7 +496,11 @@ fn report_diag(context: &mut Context, fpath: PathBuf) {
     }
 }
 
-fn on_notification(context: &mut Context, notification: &Notification) {
+fn on_notification(
+    context: &mut Context,
+    notification: &Notification,
+    analyzer_cfg: &AnalyzerConfig,
+) {
     fn update_defs_on_changed(context: &mut Context, fpath: PathBuf, content: String) {
         let file_hash = FileHash::new(content.as_str());
         context.projects.update_defs(fpath.clone(), content.clone());
@@ -530,24 +521,19 @@ fn on_notification(context: &mut Context, notification: &Notification) {
 
     match notification.method.as_str() {
         lsp_types::notification::DidSaveTextDocument::METHOD => {
+            log::info!("call did save");
             use lsp_types::DidSaveTextDocumentParams;
             let parameters =
                 serde_json::from_value::<DidSaveTextDocumentParams>(notification.params.clone())
                     .expect("could not deserialize DidSaveTextDocumentParams request");
             let fpath = parameters.text_document.uri.to_file_path().unwrap();
             let fpath = path_concat(&std::env::current_dir().unwrap(), &fpath);
-            let content = std::fs::read_to_string(fpath.as_path());
-            let content = match content {
-                Ok(x) => x,
-                Err(err) => {
-                    log::error!("read file failed,err:{:?}", err);
-                    return;
-                }
-            };
+            let content = format_on_did_save(&fpath, parameters.text, &analyzer_cfg);
             clear_ui_diag(context, fpath.clone());
-            update_defs_on_changed(context, fpath.clone(), content.clone());
+            update_defs_on_changed(context, fpath.clone(), content);
         }
         lsp_types::notification::DidChangeTextDocument::METHOD => {
+            log::info!("call did change");
             use lsp_types::DidChangeTextDocumentParams;
             let parameters =
                 serde_json::from_value::<DidChangeTextDocumentParams>(notification.params.clone())
@@ -654,4 +640,43 @@ fn send_not_project_file_error(context: &mut Context, fpath: PathBuf, is_open: b
             params: serde_json::to_value(ds).unwrap(),
         }))
         .unwrap();
+}
+
+fn format_on_did_save(
+    fpath: &PathBuf,
+    text: Option<String>,
+    analyzer_cfg: &AnalyzerConfig,
+) -> String {
+    let file_content = if let Some(content) = text {
+        content
+    } else {
+        std::fs::read_to_string(fpath).unwrap()
+    };
+
+    if !analyzer_cfg.movefmt_config.enable {
+        return file_content;
+    }
+
+    let mut movefmt_cfg = commentfmt::Config::default();
+    movefmt_cfg
+        .set()
+        .max_width(analyzer_cfg.movefmt_config.max_width as usize);
+    movefmt_cfg
+        .set()
+        .indent_size(analyzer_cfg.movefmt_config.indent_size as usize);
+
+    match movefmt::core::fmt::format_entry(file_content.clone(), movefmt_cfg) {
+        Ok(result) => {
+            if let Err(err) = std::fs::write(fpath.as_path(), result.clone()) {
+                log::error!("write file failed, err: {:?}", err);
+                file_content
+            } else {
+                result
+            }
+        }
+        Err(err) => {
+            log::error!("format file failed, err: {:?}", err);
+            file_content
+        }
+    }
 }

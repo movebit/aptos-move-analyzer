@@ -250,7 +250,7 @@ impl Handler {
         let mut res_capture_items_span = vec![];
         let mut res_result_candidates = vec![];
         let mut indexes_to_retain = vec![];
-        log::info!(
+        log::trace!(
             "start remove repeat candidate, before count: {}",
             self.capture_items_span.len()
         );
@@ -271,7 +271,7 @@ impl Handler {
                 }
             }
         }
-        log::info!("after count: {}", indexes_to_retain.len());
+        log::trace!("after count: {}", indexes_to_retain.len());
         for (index, span) in self.capture_items_span.iter().enumerate() {
             if indexes_to_retain.contains(&index) {
                 res_capture_items_span.push(*span);
@@ -342,14 +342,14 @@ impl Handler {
         if found_target_stct_or_fn {
             log::info!("finding use decl module member...");
             for stct in use_decl_module.get_structs() {
-                log::info!(
+                log::trace!(
                     "per_struct_name = {:?}, target_struct: {}",
                     stct.get_full_name_str(),
                     target_stct_or_fn
                 );
                 if stct.get_full_name_str().contains(&target_stct_or_fn) {
                     log::info!("stct.get_full_name_str() = {:?}", stct.get_full_name_str());
-                    log::info!(
+                    log::trace!(
                         "insert_result<use_decl> = {:?}",
                         env.get_source(&capture_items_loc)
                     );
@@ -365,7 +365,7 @@ impl Handler {
                 );
                 if func.get_name_str().contains(&target_stct_or_fn) {
                     log::info!("func.get_name_str() = {:?}", func.get_name_str());
-                    log::info!(
+                    log::trace!(
                         "insert_result<use_decl> = {:?}",
                         env.get_source(&capture_items_loc)
                     );
@@ -426,7 +426,7 @@ impl Handler {
                     continue;
                 }
                 let capture_ty_src = env.get_source(&capture_ty_loc);
-                log::info!(
+                log::trace!(
                     "process_parameter -- capture_ty_src 11 = {:?}",
                     capture_ty_src
                 );
@@ -494,7 +494,7 @@ impl Handler {
                         continue;
                     }
                     let capture_ty_src = env.get_source(&capture_ty_loc);
-                    log::info!(
+                    log::trace!(
                         "process_parameter -- capture_ty_src 22 = {:?}",
                         capture_ty_src
                     );
@@ -566,7 +566,7 @@ impl Handler {
                     }
                 }
             }
-            log::info!(
+            log::trace!(
                 "capture_ty_start_pos= {:?}, capture_ty_end_pos = {:?}",
                 capture_ty_start_pos,
                 capture_ty_end_pos
@@ -581,7 +581,7 @@ impl Handler {
             );
 
             if self.check_move_model_loc_contains_mouse_pos(env, &capture_ty_loc) {
-                log::info!(
+                log::trace!(
                     "process_return_type -- capture_ty_src = {:?}",
                     env.get_source(&capture_ty_loc)
                 );
@@ -597,7 +597,7 @@ impl Handler {
                     {
                         if self.check_move_model_loc_contains_mouse_pos(env, &specifier.resource.0)
                         {
-                            log::info!(
+                            log::trace!(
                                 "process_specifier -- specifier.resource = {:?}",
                                 env.get_source(&specifier.resource.0)
                             );
@@ -610,11 +610,11 @@ impl Handler {
             }
 
             if let Some(requires) = require_vec {
-                log::info!("requires = {:?}", requires);
+                log::trace!("requires = {:?}", requires);
                 for strct_id in requires {
                     let strct_env = target_fun.module_env.get_struct(strct_id);
                     let strct_str = strct_env.get_name().display(env.symbol_pool()).to_string();
-                    log::info!("process_type -->> strct_str = {:?}", strct_str);
+                    log::trace!("process_type -->> strct_str = {:?}", strct_str);
                     let capture_ty_src = if let Ok(cap_str) = env.get_source(&capture_ty_loc) {
                         cap_str
                     } else {
@@ -677,7 +677,7 @@ impl Handler {
 
         let target_fn = target_module.get_function(target_fun_id);
         let target_fn_spec = target_fn.get_spec();
-        log::info!("target_fun's spec = {}", env.display(&*target_fn_spec));
+        log::trace!("target_fun's spec = {}", env.display(&*target_fn_spec));
         self.get_mouse_loc(env, &spec_fn_span_loc);
         for cond in target_fn_spec.conditions.clone() {
             for exp in cond.all_exps() {
@@ -687,7 +687,7 @@ impl Handler {
     }
 
     fn process_struct(&mut self, env: &GlobalEnv) -> Option<()> {
-        log::info!(">> process_struct for goto definition");
+        log::info!("process_struct for goto definition");
 
         let target_module = env.get_module(self.target_module_id);
         let target_struct = target_module
@@ -711,7 +711,7 @@ impl Handler {
                 capture_field_start + codespan::ByteOffset(offset_epos as i64),
             ),
         );
-        log::info!(
+        log::trace!(
             "atomic_field_source = {:?}",
             env.get_source(&atomic_field_loc)
         );
@@ -725,7 +725,7 @@ impl Handler {
                     && atomic_field_loc.span().end() <= variant_loc.span().end()
                 {
                     let variant_str = env.get_source(&variant_loc);
-                    log::info!("variant_str = {:?}", variant_str);
+                    log::trace!("variant_str = {:?}", variant_str);
                     for field_env in target_struct.get_fields_of_variant(enum_field) {
                         field_env_vec.push(field_env);
                     }
@@ -750,7 +750,7 @@ impl Handler {
                 }
             }
         }
-        log::info!("<< process_struct for goto definition");
+        log::trace!("<< process_struct for goto definition");
         Some(())
     }
 
@@ -799,7 +799,7 @@ impl Handler {
 
         let target_stct = target_module.get_struct(target_stct_id);
         let target_stct_spec = target_stct.get_spec();
-        log::info!("target_stct's spec = {}", env.display(&*target_stct_spec));
+        log::trace!("target_stct's spec = {}", env.display(&*target_stct_spec));
         self.get_mouse_loc(env, &spec_stct_span_loc);
         for cond in target_stct_spec.conditions.clone() {
             for exp in cond.all_exps() {
@@ -845,7 +845,7 @@ impl Handler {
                     {
                         return true;
                     }
-                    log::info!(
+                    log::trace!(
                         "target: exp.visit localvar_symbol = {}",
                         localvar_symbol.display(env.symbol_pool())
                     );
@@ -991,7 +991,7 @@ impl Handler {
     fn process_call(&mut self, env: &GlobalEnv, expdata: &move_model::ast::ExpData) {
         if let Call(node_id, MoveFunction(mid, fid), _) = expdata {
             let this_call_loc = env.get_node_loc(*node_id);
-            log::info!(
+            log::trace!(
                 "<MoveFunction> exp.visit this_call_loc = {:?}",
                 env.get_location(&this_call_loc)
             );
@@ -1047,7 +1047,7 @@ impl Handler {
 
         if let Call(node_id, Pack(mid, sid, _), _) = expdata {
             let this_call_loc = env.get_node_loc(*node_id);
-            log::info!(
+            log::trace!(
                 "<Pack> exp.visit this_call_loc = {:?}",
                 env.get_location(&this_call_loc)
             );
@@ -1091,15 +1091,15 @@ impl Handler {
                 return;
             }
             let this_call_loc = env.get_node_loc(*node_id);
-            log::info!(
+            log::trace!(
                 "<builtin> exp.visit this_call_loc = {:?}",
                 env.get_location(&this_call_loc)
             );
-            log::info!(
+            log::trace!(
                 "<builtin> exp.visit this_call = {:?}",
                 env.get_source(&this_call_loc)
             );
-            log::info!("<builtin> exp.visit expdata = {:?}", expdata);
+            log::trace!("<builtin> exp.visit expdata = {:?}", expdata);
             if this_call_loc.span().start() < self.mouse_span.end()
                 && self.mouse_span.end() < this_call_loc.span().end()
             {
@@ -1156,7 +1156,7 @@ impl Handler {
 
                 let pattern_module = env.get_module(q_id.module_id);
                 let pattern_struct = pattern_module.get_struct(q_id.id);
-                log::info!("pattern_struct = {:?}", pattern_struct.get_full_name_str());
+                log::trace!("pattern_struct = {:?}", pattern_struct.get_full_name_str());
                 let pattern_struct_loc = pattern_struct.get_loc();
                 self.insert_result(env, &pattern_struct_loc, &this_call_loc);
             }
@@ -1229,7 +1229,7 @@ impl Handler {
                         }
                         let generic_struct_ty_str =
                             generic_ty.get_name().display(env.symbol_pool()).to_string();
-                        log::info!("generic_struct_ty_str = {:?}", generic_struct_ty_str);
+                        log::trace!("generic_struct_ty_str = {:?}", generic_struct_ty_str);
                         if let Some(index) = capture_ty_src.find(generic_struct_ty_str.as_str()) {
                             let capture_generic_ty_str_len = generic_struct_ty_str.len();
                             let capture_generic_ty_start = (*capture_items_loc).span().start()
@@ -1245,7 +1245,7 @@ impl Handler {
                                     capture_generic_ty_end,
                                 ),
                             );
-                            log::info!(
+                            log::trace!(
                                 "capture_generic_ty_str = {:?}",
                                 env.get_source(&capture_generic_ty_loc)
                             );
@@ -1274,7 +1274,7 @@ impl Handler {
                     .get_name()
                     .display(env.symbol_pool())
                     .to_string();
-                log::info!("process_type -->> struct_ty_str = {:?}", struct_ty_str);
+                log::trace!("process_type -->> struct_ty_str = {:?}", struct_ty_str);
                 if capture_ty_src.contains(&struct_ty_str) {
                     self.insert_result(env, &type_struct.get_loc(), capture_items_loc);
                     return true;

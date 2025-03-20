@@ -173,7 +173,7 @@ impl Project {
             .report_diag(&mut error_writer, Severity::Error);
         new_project.err_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
         if new_project.err_diags.len() > 0 {
-            log::error!(
+            log::trace!(
                 "\n*******************************************\nerr_diags = \n{}",
                 new_project.err_diags
             );
