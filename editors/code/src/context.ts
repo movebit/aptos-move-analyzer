@@ -20,6 +20,7 @@ export class Context {
     private didChangeTimer: NodeJS.Timeout | null;
     private lastChangeTime: number;
     private client: lc.LanguageClient | undefined;
+    private didchange: boolean;
     private constructor(
         private readonly extensionContext: Readonly<vscode.ExtensionContext>,
         readonly configuration: Readonly<Configuration>,
@@ -28,6 +29,7 @@ export class Context {
         this.client = client;
         this.didChangeTimer = null;
         this.lastChangeTime = 0;
+        this.didchange = false;
     }
 
     static create(
@@ -152,6 +154,7 @@ export class Context {
                 }
                 this.didChangeTimer = setTimeout(() => {
                     next(data);  
+                    this.didchange = true;
                     this.didChangeTimer = null;  
                 }, 800);
                 return Promise.resolve();
@@ -165,8 +168,11 @@ export class Context {
         client.middleware.provideCompletionItem = async (
             document, position, context, token, next
         ) => {
-            await sleep(800);
-            return next(document, position, context, token);
+            if (this.didchange) {
+                return next(document, position, context, token);
+            } else {
+                return null;
+            }
         }
         
         client.middleware.willSave = (data, next) => {
@@ -176,14 +182,6 @@ export class Context {
             }
             return next(data);
         };
-
-        // client.middleware.provideDocumentFormattingEdits = async (
-        //     document, options, token, next
-        // ) => {
-        //     // await sleep(1000);
-        //     // document.save();
-        //     return next(document, options, token);
-        // }
 
         log.info('Starting client...');
         client.start();
