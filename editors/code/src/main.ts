@@ -77,6 +77,7 @@ export async function activate(
       // false -> true
       if (!currentConfig.configuration.get<boolean>('movefmt.enable') 
         && new_configuration.configuration.get<boolean>('movefmt.enable')
+        && vscode.workspace.getConfiguration('editor').get<boolean>('formatOnSave')
       ) {
         vscode.window.showWarningMessage("movefmt::enable is different from format-on-save. \
           It might be necessary to disable the format-on-save.");
