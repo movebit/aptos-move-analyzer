@@ -662,6 +662,9 @@ fn format_on_did_save(
     movefmt_cfg
         .set()
         .indent_size(analyzer_cfg.movefmt_config.indent_size as usize);
+    movefmt_cfg
+        .set()
+        .emit_mode(commentfmt::EmitMode::Overwrite);
 
     match movefmt::core::fmt::format_entry(file_content.clone(), movefmt_cfg) {
         Ok(result) => {
