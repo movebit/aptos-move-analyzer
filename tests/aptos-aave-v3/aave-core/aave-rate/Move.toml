@@ -1,0 +1,16 @@
+[package]
+name = "AaveRate"
+version = "1.0.0"
+authors = []
+
+[addresses]
+aave_rate = '_'
+[dev-addresses]
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "mainnet" }
+AaveAcl = { local = "../aave-acl" }
+AaveConfig = { local = "../aave-config" }
+AaveMath = { local = "../aave-math" }
+
+[dev-dependencies]

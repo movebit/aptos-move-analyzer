@@ -1,0 +1,20 @@
+[package]
+name = "AavePool"
+version = "1.0.0"
+upgrade_policy = "compatible"
+authors = []
+
+[addresses]
+aave_pool = '_'
+
+[dev-addresses]
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "mainnet" }
+AaveAcl = { local = "./aave-acl" }
+AaveConfig = { local = "./aave-config" }
+AaveMath = { local = "./aave-math" }
+AaveOracle = { local = "aave-oracle" }
+AaveRate = { local = "./aave-rate" }
+
+[dev-dependencies]
