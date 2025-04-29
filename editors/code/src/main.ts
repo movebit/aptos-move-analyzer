@@ -24,6 +24,7 @@ export type LspStatus =
 let currentStatus: LspStatus = "stopped";
 // let extensionStatus: vscode.StatusBarItem;
 let analyzerLspPath: string | undefined;
+let currentConfig = new Configuration();
 
 export async function activate(
   extensionContext: Readonly<vscode.ExtensionContext>,
@@ -72,6 +73,16 @@ export async function activate(
     const client = context.getClient();
     if (client !== undefined) {
       const new_configuration = new Configuration();
+      
+      // false -> true
+      if (!currentConfig.configuration.get<boolean>('movefmt.enable') 
+        && new_configuration.configuration.get<boolean>('movefmt.enable')
+      ) {
+        vscode.window.showWarningMessage("movefmt::enable is different from format-on-save. \
+          It might be necessary to disable the format-on-save.");
+      }
+      currentConfig = new_configuration;
+
       log.info(`new_configuration: ${new_configuration.toString()}`);
       void client.sendRequest('move/lsp/client/inlay_hints/config', new_configuration.inlay_hints_config());
       void client.sendRequest('move/lsp/movefmt/config', new_configuration.movefmt_config());
@@ -80,6 +91,9 @@ export async function activate(
   reload_cfg();
   vscode.workspace.onDidChangeConfiguration(() => {
     log.info('reload_cfg ...  ');
+
+
+
     reload_cfg();
   });
 }
