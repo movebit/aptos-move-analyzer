@@ -21,6 +21,9 @@ export class Context {
     private lastChangeTime: number;
     private client: lc.LanguageClient | undefined;
     private didchange: boolean;
+
+    private didInlayHintsTimer: NodeJS.Timeout | null;
+    private lastInlayHintsTime: number;
     private constructor(
         private readonly extensionContext: Readonly<vscode.ExtensionContext>,
         readonly configuration: Readonly<Configuration>,
@@ -29,6 +32,8 @@ export class Context {
         this.client = client;
         this.didChangeTimer = null;
         this.lastChangeTime = 0;
+        this.didInlayHintsTimer = null;
+        this.lastInlayHintsTime = 0;
         this.didchange = false;
     }
 
@@ -182,6 +187,31 @@ export class Context {
             }
             return next(data);
         };
+
+        client.middleware.provideInlayHints = (
+            document: vscode.TextDocument, 
+            viewPort: vscode.Range, 
+            token: vscode.CancellationToken, 
+            next: lc.ProvideInlayHintsSignature
+        ) => {
+            const currentTime = Date.now();
+            if (currentTime - this.lastInlayHintsTime < 500) {
+                this.lastChangeTime = currentTime;
+                if (this.didInlayHintsTimer) {
+                    clearTimeout(this.didInlayHintsTimer);  // clear the previous timer
+                    this.didInlayHintsTimer = null;
+                }
+                this.didInlayHintsTimer = setTimeout(() => {
+                    next(document, viewPort, token);
+                    this.didchange = true;
+                    this.didChangeTimer = null;  
+                }, 800);
+                return null;
+            }
+
+            this.lastChangeTime = currentTime;
+            return next(document, viewPort, token);
+        }
 
         log.info('Starting client...');
         client.start();
