@@ -188,6 +188,9 @@ export class Context {
             return next(data);
         };
 
+        // This middleware is designed to debounce frontend requests for InlayHints 
+        // in order to improve the efficiency of the extension. Currently, InlayHints 
+        // may suffer from low performance, which can lead to truncation of the source code.
         client.middleware.provideInlayHints = (
             document: vscode.TextDocument, 
             viewPort: vscode.Range, 
