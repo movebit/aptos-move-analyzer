@@ -3,7 +3,7 @@
 
 use aptos_move_analyzer::{
     completion,
-    context::{Context, Debounce, FileDiags},
+    context::{Context, FileDiags},
     goto_definition, hover,
     inlay_hints::{self, *},
     move_generate_spec_file::on_generate_spec_file,
@@ -20,14 +20,12 @@ use log::{Level, Metadata, Record};
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
     notification::Notification as _, request::Request as _, CompletionOptions,
-    DidSaveTextDocumentParams, HoverProviderCapability, OneOf, SaveOptions,
+    HoverProviderCapability, OneOf, SaveOptions,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     WorkDoneProgressOptions,
 };
 use move_command_line_common::files::FileHash;
-use move_compiler::diag;
-use move_core_types::effects::Op;
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{collections::HashMap, path::PathBuf};
 use url::Url;
 
 struct AnalyzerConfig {
@@ -136,7 +134,7 @@ fn main() {
         ..Default::default()
     })
     .expect("could not serialize server capabilities");
-
+    
     context
         .connection
         .initialize_finish(
