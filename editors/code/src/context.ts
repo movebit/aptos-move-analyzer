@@ -11,9 +11,9 @@ import { sync as commandExistsSync } from 'command-exists';
 import { IndentAction } from 'vscode';
 // import { info } from 'console';
 
-// function sleep(ms: number): Promise<void> {
-//     return new Promise(resolve => setTimeout(resolve, ms));
-// }
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /** Information passed along to each VS Code command defined by this extension. */
 export class Context {
@@ -198,7 +198,7 @@ export class Context {
             next: lc.ProvideInlayHintsSignature
         ) => {
             const currentTime = Date.now();
-            if (currentTime - this.lastInlayHintsTime < 500) {
+            if (currentTime - this.lastInlayHintsTime < 300) {
                 this.lastChangeTime = currentTime;
                 if (this.didInlayHintsTimer) {
                     clearTimeout(this.didInlayHintsTimer);  // clear the previous timer
@@ -208,10 +208,10 @@ export class Context {
                     next(document, viewPort, token);
                     this.didchange = true;
                     this.didChangeTimer = null;  
-                }, 800);
-                return null;
+                }, 300);
+                return next(document, viewPort, token);
             }
-
+            // sleep(2000);
             this.lastChangeTime = currentTime;
             return next(document, viewPort, token);
         }
@@ -234,7 +234,3 @@ export class Context {
         return this.client;
     }
 } // Context
-
-function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}

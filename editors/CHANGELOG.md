@@ -1,5 +1,13 @@
 # Changelogs:
 
+## 2025/4/30 v1.0.5
+- add warning between `aptos-moveanalyzer::format enable` and `vscode::format on save`.[(#issue33)](https://github.com/movebit/aptos-move-analyzer/issues/35)
+- try avoiding to truncating source code.[(#issue33)](https://github.com/movebit/aptos-move-analyzer/issues/32)
+- optimize speed on InlayHInts.  [(#issue32)](https://github.com/movebit/aptos-move-analyzer/issues/32)
+- optimize speed on foramt. [(#issue31)](https://github.com/movebit/aptos-move-analyzer/issues/31)
+
+
+
 ## 2024/7/8 v1.0.0
 - supported `receiver style call`
 - `find reference` supported generic types in function header
