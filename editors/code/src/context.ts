@@ -11,9 +11,9 @@ import { sync as commandExistsSync } from 'command-exists';
 import { IndentAction } from 'vscode';
 // import { info } from 'console';
 
-// function sleep(ms: number): Promise<void> {
-//     return new Promise(resolve => setTimeout(resolve, ms));
-// }
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /** Information passed along to each VS Code command defined by this extension. */
 export class Context {
@@ -21,6 +21,9 @@ export class Context {
     private lastChangeTime: number;
     private client: lc.LanguageClient | undefined;
     private didchange: boolean;
+
+    private didInlayHintsTimer: NodeJS.Timeout | null;
+    private lastInlayHintsTime: number;
     private constructor(
         private readonly extensionContext: Readonly<vscode.ExtensionContext>,
         readonly configuration: Readonly<Configuration>,
@@ -29,6 +32,8 @@ export class Context {
         this.client = client;
         this.didChangeTimer = null;
         this.lastChangeTime = 0;
+        this.didInlayHintsTimer = null;
+        this.lastInlayHintsTime = 0;
         this.didchange = false;
     }
 
@@ -183,6 +188,34 @@ export class Context {
             return next(data);
         };
 
+        // This middleware is designed to debounce frontend requests for InlayHints 
+        // in order to improve the efficiency of the extension. Currently, InlayHints 
+        // may suffer from low performance, which can lead to truncation of the source code.
+        client.middleware.provideInlayHints = (
+            document: vscode.TextDocument, 
+            viewPort: vscode.Range, 
+            token: vscode.CancellationToken, 
+            next: lc.ProvideInlayHintsSignature
+        ) => {
+            const currentTime = Date.now();
+            if (currentTime - this.lastInlayHintsTime < 300) {
+                this.lastChangeTime = currentTime;
+                if (this.didInlayHintsTimer) {
+                    clearTimeout(this.didInlayHintsTimer);  // clear the previous timer
+                    this.didInlayHintsTimer = null;
+                }
+                this.didInlayHintsTimer = setTimeout(() => {
+                    next(document, viewPort, token);
+                    this.didchange = true;
+                    this.didChangeTimer = null;  
+                }, 300);
+                return next(document, viewPort, token);
+            }
+            // sleep(2000);
+            this.lastChangeTime = currentTime;
+            return next(document, viewPort, token);
+        }
+
         log.info('Starting client...');
         client.start();
         this.client = client;
@@ -201,7 +234,3 @@ export class Context {
         return this.client;
     }
 } // Context
-
-function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}

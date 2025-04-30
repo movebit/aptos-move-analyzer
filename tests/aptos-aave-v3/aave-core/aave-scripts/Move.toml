@@ -1,0 +1,23 @@
+[package]
+name = "AaveScripts"
+version = "1.0.0"
+upgrade_policy = "compatible"
+authors = []
+
+[addresses]
+
+[dev-addresses]
+
+[dependencies]
+AptosStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-stdlib", rev = "mainnet" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "mainnet" }
+AptosToken = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-token", rev = "mainnet" }
+AptosTokenObjects = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-token-objects", rev = "mainnet" }
+AaveAcl = { local = "../aave-acl" }
+AaveConfig = { local = "../aave-config" }
+AaveRate = { local = "../aave-rate" }
+AaveOracle = { local = "../aave-oracle" }
+AaveData = { local = "../aave-data" }
+AavePool = { local = "../" }
+
+[dev-dependencies]

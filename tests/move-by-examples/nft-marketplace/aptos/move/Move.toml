@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = []
 
 [addresses]
-marketplace_addr = "_"
+marketplace_addr = "0x111"
 
 [dev-addresses]
 marketplace_addr = "0x111"

@@ -28,7 +28,7 @@ impl Default for FmtConfig {
 pub fn on_movefmt_request(
     context: &Context,
     request: &Request,
-    fmt_cfg: &FmtConfig,
+    _fmt_cfg: &FmtConfig,
 ) -> lsp_server::Response {
     let r: Response = Response::new_ok(
         request.id.clone(),
