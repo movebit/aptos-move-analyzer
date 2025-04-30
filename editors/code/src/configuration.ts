@@ -41,7 +41,7 @@ function isValidUrl(url: string): boolean {
  * extension's `package.json`, under the key `"contributes.configuration.properties"`.
  */
 class Configuration {
-    private readonly configuration: vscode.WorkspaceConfiguration;
+    public readonly configuration: vscode.WorkspaceConfiguration;
 
     constructor() {
         this.configuration = vscode.workspace.getConfiguration('aptos-move-analyzer');

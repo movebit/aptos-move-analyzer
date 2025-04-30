@@ -4,7 +4,9 @@ module 0x42::ReceiverStyleCall3 {
     use Symbols::M1;
     use Symbols::M2::{Self, SomeOtherStruct, some_other_struct, multi_arg};
 
-    struct S has drop { x: u64 }
+    struct S has drop {
+        x: u64
+    }
 
     fun plus_one<T>(self: &mut S): S {
         self.x = self.x + 1;

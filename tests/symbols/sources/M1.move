@@ -3,11 +3,10 @@ module Symbols::M1 {
 
     struct SomeStruct has key, drop, store {
         some_field: u64,
-        some_field2: u64,
+        some_field2: u64
     }
 
     const SOME_CONST: u64 = 42;
-
 
     fun unpack(s: SomeStruct): u64 {
         let SomeStruct { some_field: value, some_field2: value2 } = s;
@@ -28,8 +27,6 @@ module Symbols::M1 {
         some_other_struct(SOME_CONST)
     }
 
-    
-
     fun other_mod_struct_import(): SomeOtherStruct {
         some_other_struct(6);
         some_other_struct(7)
@@ -44,8 +41,8 @@ module Symbols::M1 {
         multi_arg(SOME_CONST, SOME_CONST)
     }
 
-    fun vec(a:vector<SomeStruct>, b:vector<SomeOtherStruct>): vector<SomeStruct> {
-        let s = SomeStruct{ some_field: 7, some_field2: 1  };
+    fun vec(a: vector<SomeStruct>, b: vector<SomeOtherStruct>): vector<SomeStruct> {
+        let s = SomeStruct { some_field: 7, some_field2: 1 };
         let x = s.some_field2;
         a
     }
@@ -61,6 +58,7 @@ module Symbols::M1 {
         let tmp = 7;
         let r = &mut tmp;
         *r = SOME_CONST;
+
         tmp
     }
 }

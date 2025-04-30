@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = []
 
 [addresses]
-simple_todo_list_addr = "_"
+simple_todo_list_addr = "0x111"
 
 [dev-addresses]
 simple_todo_list_addr = "0x111"

@@ -12,9 +12,7 @@ module counter_app_addr::counter_app {
     public entry fun click(sender: &signer) acquires Counter {
         let sender_addr = signer::address_of(sender);
         if (!exists<Counter>(sender_addr)) {
-            move_to(sender, Counter {
-                count: 0
-            })
+            move_to(sender, Counter { count: 0 })
         };
         let counter = borrow_global_mut<Counter>(sender_addr);
         counter.count = counter.count + 1
