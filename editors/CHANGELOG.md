@@ -1,5 +1,9 @@
 # Changelogs:
 
+## 2025/6/13 v1.0.8
+- update aptos-core to lastest for move-compiler-v2 [(#issue38)](https://github.com/movebit/aptos-move-analyzer/issues/38)
+
+
 ## 2025/4/30 v1.0.5
 - add warning between `aptos-moveanalyzer::format enable` and `vscode::format on save`.[(#issue33)](https://github.com/movebit/aptos-move-analyzer/issues/35)
 - try avoiding to truncating source code.[(#issue33)](https://github.com/movebit/aptos-move-analyzer/issues/32)
