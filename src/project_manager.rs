@@ -59,7 +59,7 @@ impl Project {
             &mut std::io::sink(),
             &compile_cfg,
             vec![],
-            |_compiler| Ok(Default::default()),
+            // |_compiler| Ok(Default::default()),
             |compile_option| {
                 let addrs = move_model::parse_addresses_from_options(
                     compile_option.named_address_mapping.clone(),
