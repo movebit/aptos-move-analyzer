@@ -14,7 +14,7 @@ wait-timeout = "0.2.0"
 regex = "1.5.5"
 bisection = "0.1.0"
 codespan = "0.11.1"
-anyhow = "1.0.52"
+anyhow = "1.0.95"
 codespan-reporting = "0.11.1"
 im = "15.1.0"
 lsp-server = "0.7.0"
@@ -25,14 +25,15 @@ tempfile = "3.2.0"
 url = "2.2.2"
 clap = { version = "3.1.8", features = ["derive"] }
 crossbeam = "0.8"
-move-model = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2501", package = "move-model" }
-move-command-line-common = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2501", package = "move-command-line-common" }
-move-compiler = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2501", package = "move-compiler" }
-move-compiler-v2 = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2501", package = "move-compiler-v2" }
-move-ir-types = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2501", package = "move-ir-types" }
-move-package = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2501", package = "move-package" }
-move-symbol-pool = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2501", package = "move-symbol-pool" }
-move-core-types = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2501", package = "move-core-types" }
+move-model = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2506", package = "move-model" }
+move-command-line-common = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2506", package = "move-command-line-common" }
+
+move-compiler = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2506", package = "legacy-move-compiler", subdir = "third_party/move/move-compiler-v2/legacy-move-compiler" }
+
+move-ir-types = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2506", package = "move-ir-types" }
+move-package = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2506", package = "move-package" }
+move-symbol-pool = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2506", package = "move-symbol-pool" }
+move-core-types = { git = "https://github.com/movebit/aptos-core.git", branch = "improve-move-model-2506", package = "move-core-types" }
 
 movefmt = { git = "https://github.com/movebit/movefmt.git", branch = "develop" }
 commentfmt = { git = "https://github.com/movebit/movefmt.git", branch = "develop", package = "commentfmt" }

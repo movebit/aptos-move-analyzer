@@ -39,7 +39,7 @@ Move source file (a file with a `.move` file extension) and:
 
 1.If you already have installed *move-analyzer* or *sui-move-analyzer*, please disable them before installing **aptos-move-analyzer**, because it may have some conflicts.
 
-2.You need to install Aptos CLI refer as https://aptos.web3doc.top/cli-tools/aptos-cli-tool/install-aptos-cli before install `aptos-move-analyzer`.
+2.You need to install Aptos CLI from https://aptos.dev/en/build/cli before install `aptos-move-analyzer`.
 
 3.If you are unable to install versions 0.3 and above, for example, if you see version 0.3.0 but after installation, only version 0.2.0 is available, it may be due to an outdated version of Visual Studio Code. Versions 0.3 and above require Visual Studio Code version 1.85 or higher. You can check the current version of Visual Studio Code by navigating to "Help" and then selecting "About."
 
@@ -53,11 +53,9 @@ Starting from version v1.0.2, this plugin will automatically download the lsp-se
 
 #### A. Download the precompiled binaries for the aptos-move-analyzer language server(Recommended)
 
-```MacOS & Ubuntu```
- 
- > 1.Download binary files for the corresponding platform from [aptos-move-analyzer-releases-pages](https://github.com/movebit/aptos-move-analyzer/releases/tag/v1.0.0).
+ > 1.Download binary files for the corresponding platform from [aptos-move-analyzer-releases-pages](https://github.com/movebit/aptos-move-analyzer/releases/latest).
  >
- > 2.Rename it to `aptos-move-analyzer`. 
+ > 2.Rename it to `aptos-move-analyzer` or `aptos-move-analyzer.exe`. 
  > 
  > 3.Make sure `aptos-move-analyzer` can be found in your **PATH** environment.
 
