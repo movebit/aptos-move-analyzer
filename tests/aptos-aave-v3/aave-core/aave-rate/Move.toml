@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = []
 
 [addresses]
-aave_rate = '_'
+aave_rate = '0x5'
 [dev-addresses]
 
 [dependencies]

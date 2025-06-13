@@ -5,7 +5,7 @@ upgrade_policy = "compatible"
 authors = []
 
 [addresses]
-aave_large_packages = "_"
+aave_large_packages = "0x5"
 
 [dev-addresses]
 
