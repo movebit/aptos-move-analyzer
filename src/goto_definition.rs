@@ -6,7 +6,7 @@ use crate::project::Project;
 use crate::{
     analyzer_handler::*,
     context::*,
-    utils::{path_concat, FileRange},
+    utils::{FileRange, path_concat},
 };
 use codespan::Span;
 use itertools::Itertools;
@@ -1042,6 +1042,16 @@ impl Handler {
                     );
                     self.insert_result(env, &field_loc, &this_call_loc);
                 }
+            }
+        }
+
+        if let Call(node_id, SelectVariants(mid, sid, vec_fid), _) = expdata {
+            let this_call_loc = env.get_node_loc(*node_id);
+            let called_module = env.get_module(*mid);
+            let called_struct = called_module.get_struct(*sid);
+            for fid in vec_fid.iter() {
+                let field_env = called_struct.get_field(*fid);
+                self.insert_result(env, field_env.get_loc(), &this_call_loc)
             }
         }
 
