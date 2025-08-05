@@ -155,61 +155,28 @@ impl Handler {
     }
 
     fn get_mouse_loc(&mut self, env: &GlobalEnv, target_fn_or_struct_loc: &move_model::model::Loc) {
-        let mut mouse_line_first_col = move_model::model::Loc::new(
-            target_fn_or_struct_loc.file_id(),
-            codespan::Span::new(
-                target_fn_or_struct_loc.span().start(),
-                target_fn_or_struct_loc.span().start() + codespan::ByteOffset(1),
-            ),
-        );
+        let file_source = env.get_file_source(target_fn_or_struct_loc.file_id());
+        let file_index = line_index::LineIndex::new(file_source);
 
-        let mut mouse_loc = env.get_location(&mouse_line_first_col).unwrap();
-        // locate to self.line first column
-        while mouse_loc.line.0 < self.line {
-            mouse_line_first_col = move_model::model::Loc::new(
-                target_fn_or_struct_loc.file_id(),
-                codespan::Span::new(
-                    mouse_line_first_col.span().end(),
-                    mouse_line_first_col.span().end() + codespan::ByteOffset(1),
-                ),
-            );
-            mouse_loc = env.get_location(&mouse_line_first_col).unwrap();
+        if let Some(line_offset_start) = file_index.line(self.line) {
+            if let Some(line_offset_end) = file_index.offset(line_index::LineCol {
+                line: self.line,
+                col: self.col,
+            }) {
+                let mouse_source = env.get_source(&move_model::model::Loc::new(
+                    target_fn_or_struct_loc.file_id(),
+                    codespan::Span::new(
+                        u32::from(line_offset_start.start()),
+                        u32::from(line_offset_end),
+                    ),
+                ));
+                log::info!("after get mouse_source = {:?}", mouse_source);
+                self.mouse_span = codespan::Span::new(
+                    u32::from(line_offset_start.start()),
+                    u32::from(line_offset_end),
+                );
+            }
         }
-
-        // locate to self.line last column
-        let mut mouse_line_last_col = move_model::model::Loc::new(
-            target_fn_or_struct_loc.file_id(),
-            codespan::Span::new(
-                mouse_line_first_col.span().end(),
-                mouse_line_first_col.span().end() + codespan::ByteOffset(1),
-            ),
-        );
-
-        mouse_loc = env.get_location(&mouse_line_last_col).unwrap();
-        // locate to self.line first column
-        while mouse_loc.column.0 < self.col && mouse_loc.line.0 == self.line {
-            mouse_line_last_col = move_model::model::Loc::new(
-                target_fn_or_struct_loc.file_id(),
-                codespan::Span::new(
-                    mouse_line_last_col.span().end(),
-                    mouse_line_last_col.span().end() + codespan::ByteOffset(1),
-                ),
-            );
-            mouse_loc = env.get_location(&mouse_line_last_col).unwrap();
-        }
-
-        let mouse_source = env.get_source(&move_model::model::Loc::new(
-            target_fn_or_struct_loc.file_id(),
-            codespan::Span::new(
-                mouse_line_first_col.span().start(),
-                mouse_line_last_col.span().start(),
-            ),
-        ));
-        log::info!("get mouse_source = {:?}", mouse_source);
-        self.mouse_span = codespan::Span::new(
-            mouse_line_first_col.span().start(),
-            mouse_line_last_col.span().start(),
-        );
     }
 
     fn get_mouse_token_span(

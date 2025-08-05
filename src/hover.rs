@@ -140,60 +140,28 @@ impl Handler {
     }
 
     fn get_mouse_loc(&mut self, env: &GlobalEnv, target_fn_or_struct_loc: &move_model::model::Loc) {
-        let mut mouse_line_first_col = move_model::model::Loc::new(
-            target_fn_or_struct_loc.file_id(),
-            codespan::Span::new(
-                target_fn_or_struct_loc.span().start() + codespan::ByteOffset(1),
-                target_fn_or_struct_loc.span().start() + codespan::ByteOffset(2),
-            ),
-        );
-        let mut mouse_loc = env.get_location(&mouse_line_first_col).unwrap();
-        // locate to self.line first column
-        while mouse_loc.line.0 < self.line {
-            mouse_line_first_col = move_model::model::Loc::new(
-                target_fn_or_struct_loc.file_id(),
-                codespan::Span::new(
-                    mouse_line_first_col.span().start() + codespan::ByteOffset(1),
-                    target_fn_or_struct_loc.span().end(),
-                ),
-            );
-            mouse_loc = env.get_location(&mouse_line_first_col).unwrap();
+        let file_source = env.get_file_source(target_fn_or_struct_loc.file_id());
+        let file_index = line_index::LineIndex::new(file_source);
+
+        if let Some(line_offset_start) = file_index.line(self.line) {
+            if let Some(line_offset_end) = file_index.offset(line_index::LineCol {
+                line: self.line,
+                col: self.col,
+            }) {
+                let mouse_source = env.get_source(&move_model::model::Loc::new(
+                    target_fn_or_struct_loc.file_id(),
+                    codespan::Span::new(
+                        u32::from(line_offset_start.start()),
+                        u32::from(line_offset_end),
+                    ),
+                ));
+                log::info!("after get mouse_source = {:?}", mouse_source);
+                self.mouse_span = codespan::Span::new(
+                    u32::from(line_offset_start.start()),
+                    u32::from(line_offset_end),
+                );
+            }
         }
-        // locate to self.line last column
-        let mut mouse_line_last_col = move_model::model::Loc::new(
-            target_fn_or_struct_loc.file_id(),
-            codespan::Span::new(
-                mouse_line_first_col.span().start() + codespan::ByteOffset(1),
-                mouse_line_first_col.span().start() + codespan::ByteOffset(2),
-            ),
-        );
-
-        mouse_loc = env.get_location(&mouse_line_last_col).unwrap();
-        // locate to self.line first column
-        while mouse_loc.column.0 < self.col && mouse_loc.line.0 == self.line {
-            mouse_line_last_col = move_model::model::Loc::new(
-                target_fn_or_struct_loc.file_id(),
-                codespan::Span::new(
-                    mouse_line_last_col.span().start() + codespan::ByteOffset(1),
-                    target_fn_or_struct_loc.span().end(),
-                ),
-            );
-            mouse_loc = env.get_location(&mouse_line_last_col).unwrap();
-        }
-
-        let mouse_source = env.get_source(&move_model::model::Loc::new(
-            target_fn_or_struct_loc.file_id(),
-            codespan::Span::new(
-                mouse_line_first_col.span().start(),
-                mouse_line_last_col.span().start(),
-            ),
-        ));
-        log::info!("<on hover> mouse_source = {:?}", mouse_source);
-
-        self.mouse_span = codespan::Span::new(
-            mouse_line_first_col.span().start(),
-            mouse_line_last_col.span().start(),
-        );
     }
 
     fn process_use_decl(&mut self, env: &GlobalEnv) {
@@ -309,6 +277,7 @@ impl Handler {
         let target_fun = target_module.get_function(target_fun_id);
         let target_fun_loc = target_fun.get_loc();
         self.target_function_id = Some(target_fun.get_id());
+        log::info!("process function: {}", target_fun.get_name_string());
         self.get_mouse_loc(env, &target_fun_loc);
         if let Some(exp) = target_fun.get_def().as_deref() {
             self.process_expr(env, exp);
@@ -397,6 +366,7 @@ impl Handler {
         let target_module = env.get_module(self.target_module_id);
         let target_struct = target_module.get_struct(target_struct_id);
         let target_struct_loc = target_struct.get_loc();
+        log::info!("process struct: {}", target_struct.get_full_name_str());
         self.get_mouse_loc(env, &target_struct_loc);
 
         for field_env in target_struct.get_fields() {
@@ -639,8 +609,8 @@ impl Handler {
             let field_loc = move_model::model::Loc::new(
                 this_loc.file_id(),
                 Span::new(
-                    this_loc.span().start() + codespan::ByteOffset(pair[0].1 .0 as i64),
-                    this_loc.span().start() + codespan::ByteOffset(pair[0].1 .1 as i64),
+                    this_loc.span().start() + codespan::ByteOffset(pair[0].1.0 as i64),
+                    this_loc.span().start() + codespan::ByteOffset(pair[0].1.1 as i64),
                 ),
             );
 
