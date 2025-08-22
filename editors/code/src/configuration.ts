@@ -29,6 +29,13 @@ class FmtConfig {
     }
 }
 
+export type LanguageVersion =
+    | "V1"
+    | "V2.0"
+    | "V2.1"
+    | "V2.2"
+    | "V2.3";
+
 function isValidUrl(url: string): boolean {
     const regex = /^(https?:\/\/)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$/;
     return regex.test(url);
@@ -79,6 +86,12 @@ class Configuration {
             serverPath = serverPath + '.exe';
         }
         return Path.resolve(serverPath);
+    }
+
+    getLanguageVersion(): LanguageVersion {
+        const config = vscode.workspace.getConfiguration("aptos-move-analyzer");
+        const version = config.get<LanguageVersion>("languageVersion", "V2.0");
+        return version;
     }
 
     inlay_hints_config(): InlayHintsConfig {

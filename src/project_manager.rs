@@ -42,7 +42,7 @@ impl Project {
             skip_fetch_latest_git_deps: true,
             compiler_config: move_package::CompilerConfig {
                 compiler_version: Some(CompilerVersion::V2_1),
-                language_version: Some(LanguageVersion::V2_1),
+                language_version: Some(get_language_version()),
                 ..Default::default()
             },
             ..Default::default()
@@ -52,7 +52,7 @@ impl Project {
         let build_plan = BuildPlan::create(resolution_graph)?;
         let compile_cfg = move_package::CompilerConfig {
             compiler_version: Some(CompilerVersion::V2_1),
-            language_version: Some(LanguageVersion::V2_1),
+            language_version: Some(get_language_version()),
             ..Default::default()
         };
         let (_, env) = build_plan.compile_with_driver(
@@ -105,7 +105,7 @@ impl Project {
                     }],
                     true,
                     &Default::default(),
-                    LanguageVersion::V2_1,
+                    get_language_version(),
                     false,
                     false,
                     true,
@@ -273,8 +273,7 @@ impl Project {
             std::result::Result::Err(err) => {
                 report_err(format!(
                     "parse manifest '{:?} 'failed.\n addr must exactly 32 length or start with '0x' like '0x2'\n{:?}",
-                    manifest_path,
-                    err
+                    manifest_path, err
                 ));
                 log::error!("parse_move_manifest_from_file failed,err:{:?}", err);
                 self.manifest_load_failures.insert(manifest_path.clone());
@@ -365,4 +364,24 @@ impl Project {
     ) {
         visitor.handle_project_env(self, &self.global_env, filepath, source_str);
     }
+}
+
+static mut LANGUAGE_VERSION: LanguageVersion = LanguageVersion::V2_1;
+
+pub fn set_language_version(version: String) {
+    match version.as_str() {
+        "V1" => unsafe { LANGUAGE_VERSION = LanguageVersion::V1 },
+        "V2.0" => unsafe { LANGUAGE_VERSION = LanguageVersion::V2_0 },
+        "V2.1" => unsafe { LANGUAGE_VERSION = LanguageVersion::V2_1 },
+        "V2.2" => unsafe { LANGUAGE_VERSION = LanguageVersion::V2_2 },
+        "V2.3" => unsafe { LANGUAGE_VERSION = LanguageVersion::V2_3 },
+        _ => {
+            log::warn!("Unsupported language version: {}", version);
+            unsafe { LANGUAGE_VERSION = LanguageVersion::V2_1 }
+        }
+    }
+}
+
+fn get_language_version() -> LanguageVersion {
+    unsafe { LANGUAGE_VERSION }
 }

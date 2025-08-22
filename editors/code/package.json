@@ -5,7 +5,7 @@
 	"publisher": "MoveBit",
 	"icon": "images/move.png",
 	"license": "Apache-2.0",
-	"version": "1.0.8",
+	"version": "1.1.0",
 	"preview": false,
 	"homepage": "https://github.com/movebit/aptos-move-analyzer",
 	"repository": {
@@ -95,6 +95,25 @@
 					"type": "string",
 					"default": "~/.cargo/bin/aptos-move-analyzer",
 					"markdownDescription": "Path and filename of the aptos-move-analyzer executable, e.g. `/usr/bin/aptos-move-analyzer`."
+				},
+				 "aptos-move-analyzer.languageVersion": {
+					"type": "string",
+					"default": "V2.1",
+					"enum": [
+						"V1",
+						"V2.0",
+						"V2.1",
+						"V2.2",
+						"V2.3"
+					],
+					"enumDescriptions": [
+						"The version of Move at around the genesis of the Aptos network end of '22. This is the original Diem Move plus the extension of inline functions with lambda parameters, as well as a simple form of `for` loops.",
+						"The 2.0 version of Move.",
+						"The 2.1 version of Move.",
+						"The currently unstable 2.2 version of Move.",
+						"The currently unstable 2.3 version of Move."
+					],
+					"markdownDescription": "Select the Move language version to use."
 				},
 				"aptos-move-analyzer.inlay.hints.enable": {
 					"type": "boolean",

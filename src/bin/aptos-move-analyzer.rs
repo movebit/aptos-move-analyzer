@@ -10,6 +10,7 @@ use aptos_move_analyzer::{
     move_generate_spec_sel::on_generate_spec_sel,
     movefmt::*,
     multiproject::MultiProject,
+    project_manager::set_language_version,
     references, symbols,
     utils::*,
 };
@@ -19,10 +20,9 @@ use itertools::Itertools;
 use log::{Level, Metadata, Record};
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
-    notification::Notification as _, request::Request as _, CompletionOptions,
-    HoverProviderCapability, OneOf, SaveOptions,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    WorkDoneProgressOptions,
+    CompletionOptions, HoverProviderCapability, OneOf, SaveOptions, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
+    notification::Notification as _, request::Request as _,
 };
 use move_command_line_common::files::FileHash;
 use std::{collections::HashMap, path::PathBuf};
@@ -134,7 +134,7 @@ fn main() {
         ..Default::default()
     })
     .expect("could not serialize server capabilities");
-    
+
     context
         .connection
         .initialize_finish(
@@ -174,6 +174,7 @@ fn main() {
 }
 
 fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut AnalyzerConfig) {
+    log::info!("request.method.as_str(): {}", request.method.as_str());
     match request.method.as_str() {
         lsp_types::request::GotoDefinition::METHOD => {
             goto_definition::on_go_to_def_request(context, request);
@@ -204,6 +205,16 @@ fn on_request(context: &mut Context, request: &Request, analyzer_cfg: &mut Analy
         }
         "move/generate/spec/sel" => {
             on_generate_spec_sel(context, request);
+        }
+        "move/lsp/language_version" => {
+            log::info!("call language version: {:?}", request.params);
+            let parameters = serde_json::from_value::<Vec<String>>(request.params.clone());
+            let version = parameters
+                .unwrap_or(vec!["V2.1".to_string()])
+                .get(0)
+                .cloned()
+                .unwrap_or("V2.1".to_string());
+            set_language_version(version);
         }
         "move/lsp/client/inlay_hints/config" => {
             let parameters = serde_json::from_value::<InlayHintsConfig>(request.params.clone())
@@ -662,9 +673,7 @@ fn format_on_did_save(
     movefmt_cfg
         .set()
         .indent_size(analyzer_cfg.movefmt_config.indent_size as usize);
-    movefmt_cfg
-        .set()
-        .emit_mode(commentfmt::EmitMode::Overwrite);
+    movefmt_cfg.set().emit_mode(commentfmt::EmitMode::Overwrite);
 
     match movefmt::core::fmt::format_entry(file_content.clone(), movefmt_cfg) {
         Ok(result) => {

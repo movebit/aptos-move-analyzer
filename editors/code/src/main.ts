@@ -87,6 +87,8 @@ export async function activate(
       log.info(`new_configuration: ${new_configuration.toString()}`);
       void client.sendRequest('move/lsp/client/inlay_hints/config', new_configuration.inlay_hints_config());
       void client.sendRequest('move/lsp/movefmt/config', new_configuration.movefmt_config());
+      void client.sendRequest('move/lsp/language_version', new_configuration.getLanguageVersion());
+      log.info(`sent new configuration to the server`);
     }
   };
   reload_cfg();
